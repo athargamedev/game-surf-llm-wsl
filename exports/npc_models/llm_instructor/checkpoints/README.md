@@ -5,8 +5,8 @@ model_name: checkpoints
 tags:
 - generated_from_trainer
 - trl
-- sft
 - unsloth
+- sft
 licence: license
 ---
 

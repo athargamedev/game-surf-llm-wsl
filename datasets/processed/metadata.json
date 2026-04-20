@@ -2,10 +2,10 @@
   "format": "chatml",
   "npc_scope": "instructor",
   "task_type": "mixed",
-  "total_examples": 77,
+  "total_examples": 90,
   "splits": {
-    "train": 62,
-    "validation": 7,
-    "test": 8
+    "train": 72,
+    "validation": 9,
+    "test": 9
   }
 }

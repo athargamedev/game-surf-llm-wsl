@@ -433,6 +433,15 @@
                     <div class="npc-option" data-npc="movies_instructor">
                         🎬 Movies Instructor
                     </div>
+                    <div class="npc-option" data-npc="astronomy_instructor">
+                        🔭 Astronomy Instructor
+                    </div>
+                    <div class="npc-option" data-npc="ai_news_instructor">
+                        📰 AI News Analyst
+                    </div>
+                    <div class="npc-option" data-npc="supabase_instructor">
+                        🗄️ Supabase Master
+                    </div>
                 </div>
             </div>
 
@@ -571,6 +580,10 @@
             // Generate consistent player ID from name only (deterministic)
             const oldName = currentPlayerName;
             if (newName !== oldName) {
+                // End current session before switching players
+                if (currentSessionId) {
+                    await endCurrentSession(false, currentNpc);
+                }
                 currentPlayerName = newName;
                 // Use name-based ID without random suffix for stable identity
                 const stableId = 'player_' + newName.toLowerCase().replace(/[^a-z0-9]/g, '_');

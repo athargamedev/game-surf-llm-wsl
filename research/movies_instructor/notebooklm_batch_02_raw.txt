@@ -1,4 +1,5 @@
-21:06:45 WARNING [notebooklm._chat] No answer extracted from response (6 lines parsed)
+Matched: 723060e4-a84... (Movies Instructor Research)
+18:58:25 WARNING [notebooklm._chat] No answer extracted from response (6 lines parsed)
 {
   "answer": "",
   "conversation_id": "1628107e-8fee-48e4-adb8-34061ab7742e",

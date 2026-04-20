@@ -1,10 +1,27 @@
 {
-  "total_steps": 2,
-  "train_losses": [],
+  "total_steps": 36,
+  "train_losses": [
+    {
+      "step": 10,
+      "loss": 2.5575252532958985
+    },
+    {
+      "step": 20,
+      "loss": 1.879061508178711
+    },
+    {
+      "step": 30,
+      "loss": 1.0316900253295898
+    }
+  ],
   "eval_losses": [
     {
-      "step": 2,
-      "eval_loss": 2.9869132041931152
+      "step": 25,
+      "eval_loss": 1.9255013465881348
+    },
+    {
+      "step": 36,
+      "eval_loss": 1.9508097171783447
     }
   ],
   "overfitting_detected": false
