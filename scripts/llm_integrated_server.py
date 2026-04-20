@@ -444,10 +444,12 @@ def score_memory_relevance(memory_text: str, current_message: str) -> float:
 
 
 def load_player_context(player_id: str, npc_id: str, current_message: str = "") -> str:
+    print(f"[MEMORY] load_player_context called for player_id={player_id} npc_id={npc_id}")
     profile_lines: list[str] = []
     memory_lines: list[str] = []
     term_lines: list[str] = []
     if supabase_client is None:
+        print(f"[MEMORY] Supabase client is not connected")
         return "No saved player memory."
 
     try:
@@ -476,6 +478,7 @@ def load_player_context(player_id: str, npc_id: str, current_message: str = "") 
         session_count = session_count_resp.count or 0
         
         mem_limit = min(5, max(2, session_count)) if session_count > 10 else 5
+        print(f"[MEMORY] Querying npc_memories for player_id={player_id} npc_id={npc_id} limit={mem_limit}")
         mem_response = (
             supabase_client.table("npc_memories")
             .select("summary, created_at, raw_json")
@@ -484,6 +487,7 @@ def load_player_context(player_id: str, npc_id: str, current_message: str = "") 
             .limit(mem_limit)
             .execute()
         )
+        print(f"[MEMORY] npc_memories rows returned: {len(mem_response.data) if mem_response.data else 0}")
         if mem_response.data:
             summaries: list[str] = []
             for row in mem_response.data:
@@ -909,6 +913,7 @@ async def chat_stream(request: ChatRequest):
 @app.post("/session/start", response_model=StartSessionResponse)
 def start_session(request: StartSessionRequest) -> StartSessionResponse:
     """Create a new dialogue session and load prior memory for this player+NPC."""
+    print(f"[MEMORY] /session/start called for player_id={request.player_id} npc_id={request.npc_id}")
     session_id: str | None = None
     memory_summary: str | None = None
 
@@ -917,10 +922,23 @@ def start_session(request: StartSessionRequest) -> StartSessionResponse:
             # End any existing active session for this player+NPC
             session_key = f"{request.player_id}_{request.npc_id}"
             old_session_id = active_sessions.get(session_key)
+            if not old_session_id:
+                active_session_resp = (
+                    supabase_client.table("dialogue_sessions")
+                    .select("session_id")
+                    .match({"player_id": request.player_id, "npc_id": request.npc_id, "status": "active"})
+                    .order("started_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                if active_session_resp.data:
+                    old_session_id = active_session_resp.data[0].get("session_id")
             if old_session_id:
+                print(f"[MEMORY] Ending stale active session {old_session_id} for {request.player_id}/{request.npc_id}")
                 supabase_client.table("dialogue_sessions").update(
                     {"status": "ended", "ended_at": "now()"}
                 ).eq("session_id", old_session_id).execute()
+                active_sessions.pop(session_key, None)
 
             # Create or update the player profile when a name was supplied
             if request.player_name:
@@ -946,6 +964,7 @@ def start_session(request: StartSessionRequest) -> StartSessionResponse:
                 active_sessions[session_key] = session_id
 
             # Load latest memory summary
+            print(f"[MEMORY] Loading latest npc_memories summary for {request.player_id}/{request.npc_id}")
             mem_resp = (
                 supabase_client.table("npc_memories")
                 .select("summary")
@@ -954,6 +973,7 @@ def start_session(request: StartSessionRequest) -> StartSessionResponse:
                 .limit(1)
                 .execute()
             )
+            print(f"[MEMORY] /session/start npc_memories rows returned: {len(mem_resp.data) if mem_resp.data else 0}")
             if mem_resp.data:
                 memory_summary = mem_resp.data[0]["summary"]
         except Exception as exc:

@@ -86,7 +86,7 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 42,
+      "sample_count": 77,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - AI News Analyst"
