@@ -4,8 +4,8 @@ library_name: transformers
 model_name: checkpoints
 tags:
 - generated_from_trainer
-- sft
 - trl
+- sft
 - unsloth
 licence: license
 ---

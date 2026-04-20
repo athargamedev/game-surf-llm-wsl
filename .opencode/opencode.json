@@ -6,6 +6,10 @@
       "type": "remote",
       "url": "http://172.29.235.102:16434/api/mcp"
     },
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
+    },
     "unity-mcp": {
       "command": [
         "cmd",
