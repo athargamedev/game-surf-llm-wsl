@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import asyncio
 import json
 import os
 import re
@@ -13,6 +14,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from llama_index.core import StorageContext, SimpleDirectoryReader, Settings, VectorStoreIndex, load_index_from_storage
@@ -350,7 +352,9 @@ def npc_adapter_is_active(npc_id: str) -> bool:
 
 
 def llama3_messages_to_prompt(messages: list[ChatMessage]) -> str:
-    prompt_parts = ["<|begin_of_text|>"]
+    # Note: Don't add <|begin_of_text|> here - llama.cpp chat template adds it automatically
+    # Adding it twice causes the "Detected duplicate" warning
+    prompt_parts = []
     for message in messages:
         role = message.role.value if hasattr(message.role, "value") else str(message.role)
         content = str(message.content).strip()
@@ -832,6 +836,74 @@ def chat(request: ChatRequest) -> ChatResponse:
         return ChatResponse(npc_response=npc_text, session_id=session_id)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """Stream NPC response tokens in real-time using Server-Sent Events (SSE)."""
+    select_npc_runtime(request.npc_id)
+    if Settings.llm is None:
+        raise HTTPException(status_code=500, detail="NPC Brain model is not loaded.")
+
+    async def generate():
+        try:
+            engine = get_chat_engine(request.player_id, request.npc_id)
+            
+            # For streaming, we'll collect the full response then stream it word-by-word
+            # This is a practical compromise since LlamaCPP streaming is complex
+            if isinstance(engine, DirectNpcChatSession):
+                npc_text = run_direct_chat(engine, request.message)
+            else:
+                response = engine.chat(request.message)
+                npc_text = clean_npc_response(str(response))
+            
+            # Stream the response word by word with small delays for visual effect
+            words = npc_text.split()
+            for i, word in enumerate(words):
+                # Yield word + space (except for last word)
+                chunk = word + (' ' if i < len(words) - 1 else '')
+                yield chunk
+                # Small delay between words for streaming effect (50ms per word)
+                await asyncio.sleep(0.05)
+            
+            # After streaming response, save to Supabase
+            session_key = f"{request.player_id}_{request.npc_id}"
+            session_id = request.session_id or active_sessions.get(session_key)
+            if session_id:
+                active_sessions[session_key] = session_id
+
+            if supabase_client is not None:
+                try:
+                    # Create session if none exists
+                    if not session_id:
+                        sess_resp = supabase_client.table("dialogue_sessions").insert({
+                            "player_id": request.player_id,
+                            "npc_id": request.npc_id,
+                            "status": "active",
+                        }).execute()
+                        if sess_resp.data:
+                            session_id = sess_resp.data[0]["session_id"]
+                            active_sessions[session_key] = session_id
+
+                    # Record the turn
+                    if session_id:
+                        supabase_client.table("dialogue_turns").insert({
+                            "session_id": session_id,
+                            "player_message": request.message,
+                            "npc_response": npc_text,
+                            "raw_json": json.dumps({
+                                "user": request.message,
+                                "npc": npc_text,
+                            }),
+                        }).execute()
+                    print(f"Saved turn for session {session_id}")
+                except Exception as exc:
+                    print(f"Supabase write error: {exc}")
+        
+        except Exception as exc:
+            yield f"ERROR: {str(exc)}"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @app.post("/session/start", response_model=StartSessionResponse)

@@ -253,35 +253,7 @@ permission:
 # Metadata (id, name, category, type, version, author, tags, dependencies) is stored in:
 # .opencode/config/agent-metadata.json
 
-    ├── cloudflare-deployment.md
-    ├── server-functions.md
-    └── file-routing.md
-   - `fetched:` timestamp (is it < 7 days old?)
-   - `topic:` (does it match user's query?)
-   - `tech_stack:` (does it match detected framework?)
-  "version": "1.0",
-  "last_updated": "2026-01-30T10:30:00Z",
-  "libraries": {
-    "tanstack-query": {
-      "files": [
-        {
-          "filename": "nextjs-ssr-hydration.md",
-          "topic": "SSR hydration",
-          "tech_stack": "Next.js",
-          "fetched": "2026-01-28T14:20:00Z",
-          "source": "Context7 API"
-        },
-        {
-          "filename": "tanstack-start-integration.md",
-          "topic": "server functions integration",
-          "tech_stack": "TanStack Start",
-          "fetched": "2026-01-30T10:15:00Z",
-          "source": "Official docs"
-        }
-      ]
-    }
-  }
----
+    ---
 
 ## Error Handling
 

@@ -28,6 +28,7 @@
             grid-template-columns: 300px 1fr;
             gap: 20px;
             height: 80vh;
+            height: 80dvh;     /* dynamic viewport — adjusts for iOS keyboard */
         }
 
         /* Sidebar */
@@ -103,7 +104,7 @@
             border: 2px solid #e9ecef;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
             background: white;
             text-align: center;
             font-weight: 500;
@@ -268,7 +269,7 @@
             border-radius: 8px;
             font-size: 14px;
             font-family: inherit;
-            transition: border-color 0.3s;
+            transition: border-color 0.2s ease;
         }
 
         .chat-input:focus {
@@ -289,7 +290,7 @@
             border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: background-color 0.2s ease, transform 0.15s ease;
             font-size: 14px;
         }
 
@@ -337,7 +338,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
-            transition: all 0.2s;
+            transition: background-color 0.15s ease;
         }
 
         .control-btn:hover {
@@ -391,6 +392,14 @@
                 </div>
             </div>
 
+            <!-- Memory Context (Realtime) -->
+            <div class="sidebar-section" id="memorySection" style="display: none;">
+                <h3>Memory Context</h3>
+                <div class="status-card" id="memoryCard">
+                    <div class="label">Loading...</div>
+                </div>
+            </div>
+
             <!-- Player Profile -->
             <div class="sidebar-section">
                 <h3>Player Profile</h3>
@@ -432,6 +441,12 @@
                     </div>
                     <div class="npc-option" data-npc="movies_instructor">
                         🎬 Movies Instructor
+                    </div>
+                    <div class="npc-option" data-npc="supabase_instructor">
+                        🗄️ Supabase Instructor
+                    </div>
+                    <div class="npc-option" data-npc="ai_news_instructor">
+                        🤖 AI News Analyst
                     </div>
                 </div>
             </div>
@@ -492,6 +507,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         const API_BASE = 'http://127.0.0.1:8000';
         let currentNpc = 'maestro_jazz_instructor';
@@ -505,26 +521,265 @@
         let serverModels = {};
         localStorage.setItem('game_surf_player_id', currentPlayerId);
 
+        // Supabase Realtime Configuration
+        // For local dev: use local Supabase (port 16433)
+        // For remote: use your deployed Supabase URL
+        const SUPABASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://127.0.0.1:16433' 
+            : 'https://your-supabase-project.supabaseClientco';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IkxMTV9XU0wiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0NTUwMDAwMCwiZXhwIjoyMDYxMDY1NjAwfQ.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IkxMTV9XU0wiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0NTUwMDAwMCwiZXhwIjoyMDYxMDY1NjAwfQ';
+        
+        // Use supabaseClient to avoid conflict with global from CDN
+        let supabaseClient = null;
+        let dialogueChannel = null;
+        
+        // Initialize Supabase client
+        function initSupabase() {
+            if (typeof supabaseClient !== 'undefined' && supabaseClient) return;
+            
+            try {
+                supabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    realtime: {
+                        params: {
+                            eventsPerSecond: 10
+                        }
+                    }
+                });
+                console.log('Supabase client initialized');
+                setupRealtimeChannels();
+                subscribeToMemoryUpdates();
+                
+                // Show memory section when Supabase is available
+                const memorySection = document.getElementById('memorySection');
+                if (memorySection) memorySection.style.display = 'block';
+            } catch (e) {
+                console.warn('Supabase initialization failed:', e);
+            }
+        }
+        
+        // Setup realtime channels for dialogue
+        function setupRealtimeChannels() {
+            if (!supabase) return;
+            
+            // Subscribe to dialogue turns for current player+NPC
+            const channelName = `dialogue:${currentPlayerId}:${currentNpc}`;
+            
+            if (dialogueChannel) {
+                supabaseClientremoveChannel(dialogueChannel);
+            }
+            
+            dialogueChannel = supabaseClientchannel(channelName, {
+                config: {
+                    broadcast: { self: false },
+                    presence: { key: currentPlayerId }
+                }
+            });
+            
+            dialogueChannel
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'dialogue_turns',
+                    filter: `player_id=eq.${currentPlayerId}`
+                }, (payload) => {
+                    console.log('New dialogue turn:', payload);
+                    if (payload.new?.session_id === currentSessionId) {
+                        // New turn in current session
+                        if (payload.new.npc_response && payload.new.player_message) {
+                            addMessage('npc', payload.new.npc_response);
+                        }
+                    }
+                })
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'dialogue_sessions',
+                    filter: `player_id=eq.${currentPlayerId}`
+                }, (payload) => {
+                    console.log('Session updated:', payload);
+                    if (payload.new?.status === 'ended') {
+                        // Session ended externally
+                        showNotification('Session ended');
+                    }
+                })
+                .subscribe((status) => {
+                    console.log('Realtime channel status:', status);
+                });
+        }
+        
+        // Subscribe to NPC memory updates
+        function subscribeToMemoryUpdates() {
+            if (!supabase) return;
+            
+            supabaseClientchannel(`memory:${currentPlayerId}:${currentNpc}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'npc_memories',
+                    filter: `player_id=eq.${currentPlayerId}`
+                }, (payload) => {
+                    console.log('Memory updated:', payload);
+                    // Update memory context display
+                    loadMemoryContext();
+                })
+                .subscribe();
+        }
+        
+        // Load memory context for current player+NPC
+        async function loadMemoryContext() {
+            if (!supabase) return;
+            
+            try {
+                const { data, error } = await supabaseClientrpc('get_compact_memory', {
+                    p_player_id: currentPlayerId,
+                    p_npc_id: currentNpc
+                });
+                
+                if (!error && data && data.length > 0) {
+                    const memory = data[0];
+                    const memoryCard = document.getElementById('memoryCard');
+                    if (memoryCard && memory.summary) {
+                        memoryCard.innerHTML = `
+                            <div class="label">Memory Context</div>
+                            <div class="value">${memory.summary.substring(0, 200)}${memory.summary.length > 200 ? '...' : ''}</div>
+                            <div style="margin-top: 8px; font-size: 10px; color: #666;">
+                                ${memory.session_count || 0} sessions · ${memory.turn_count || 0} turns
+                            </div>
+                        `;
+                    }
+                }
+            } catch (e) {
+                console.warn('Memory load failed:', e);
+            }
+        }
+        
+        // Subscribe to session updates
+        function subscribeToSession(sessionId) {
+            if (!supabase || !sessionId) return;
+            
+            supabaseClientchannel(`session:${sessionId}`)
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'dialogue_sessions',
+                    filter: `session_id=eq.${sessionId}`
+                }, (payload) => {
+                    console.log('Session status changed:', payload.new);
+                    if (payload.new?.status === 'ended') {
+                        showNotification('Session ended by server');
+                    }
+                })
+                .subscribe();
+        }
+
+        // Helper: Show notification
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #667eea;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+
         const npcNames = {
             'maestro_jazz_instructor': 'The Maestro',
             'kosmos_instructor': 'Professor Kosmos',
             'llm_instructor': 'Professor LoRA',
             'brazilian_history': 'Professor Pedro',
             'marvel_comics_instructor': 'Marvel Comics Instructor',
-            'movies_instructor': 'Professor Reel'
+            'movies_instructor': 'Professor Reel',
+            'supabase_instructor': 'Professor Supabase',
+            'ai_news_instructor': 'AI News Analyst'
         };
 
         // Initialize
+        let statusPollInterval = null;
+        let sessionReadyPromise = null;
+        const MAX_VISIBLE_MESSAGES = 100;
+        let statusRetryDelay = 2000;
+        
+        function startStatusPolling() {
+            if (statusPollInterval) clearInterval(statusPollInterval);
+            statusPollInterval = setInterval(async () => {
+                const wasOnline = document.querySelector('.status-badge.online') !== null;
+                await checkServerStatus();
+                const isOnline = document.querySelector('.status-badge.online') !== null;
+                // Slow down polling when stable (15s interval)
+                if (wasOnline && isOnline) {
+                    clearInterval(statusPollInterval);
+                    statusPollInterval = setInterval(() => checkServerStatus(), 15000);
+                }
+            }, statusRetryDelay);
+        }
+        
+        async function ensureSession() {
+            if (currentSessionId) return;
+            if (sessionReadyPromise) return sessionReadyPromise;
+            sessionReadyPromise = startNewSession().finally(() => {
+                sessionReadyPromise = null;
+            });
+            return sessionReadyPromise;
+        }
+        
+        function trimMessageHistory() {
+            const container = document.getElementById('messageContainer');
+            const messages = container.querySelectorAll('.message:not(.message-loading)');
+            if (messages.length > MAX_VISIBLE_MESSAGES) {
+                const toRemove = messages.length - MAX_VISIBLE_MESSAGES;
+                for (let i = 0; i < toRemove; i++) {
+                    messages[i].remove();
+                }
+            }
+        }
+        
+        function scrollToBottom() {
+            const container = document.getElementById('messageContainer');
+            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        }
+        
+        async function fetchWithRetry(url, options, maxRetries = 2) {
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok && attempt < maxRetries) {
+                        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+                        continue;
+                    }
+                    return response;
+                } catch (err) {
+                    if (attempt === maxRetries) throw err;
+                    await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+                }
+            }
+        }
+        
         async function initialize() {
+            // Initialize Supabase realtime first
+            initSupabase();
+            
             setupNpcSelection();
             setupPlayerNameInput();
             updatePlayerDisplay();
             await loadNpcModels();
             updateDatasetInfo();
-            // Force initial status check with no caching
+            
+            // Load memory context if Supabase available
+            await loadMemoryContext();
+            
+            // Single status check with polling enabled
             await checkServerStatus();
-            // Try again after a short delay if initial check failed
-            setTimeout(checkServerStatus, 1000);
+            startStatusPolling();
             await startNewSession();
         }
 
@@ -532,13 +787,22 @@
             document.querySelectorAll('.npc-option').forEach(option => {
                 option.addEventListener('click', async function() {
                     const previousNpc = currentNpc;
-                    await endCurrentSession(false, previousNpc);
-                    document.querySelectorAll('.npc-option').forEach(o => o.classList.remove('active'));
-                    this.classList.add('active');
-                    currentNpc = this.dataset.npc;
-                    updateDatasetInfo();
-                    await selectNpcAdapter();
-                    await startNewSession();
+                    const originalText = this.textContent;
+                    this.textContent = '⏳ Loading...';
+                    this.style.pointerEvents = 'none';
+                    
+                    try {
+                        await endCurrentSession(false, previousNpc);
+                        document.querySelectorAll('.npc-option').forEach(o => o.classList.remove('active'));
+                        this.classList.add('active');
+                        currentNpc = this.dataset.npc;
+                        updateDatasetInfo();
+                        await selectNpcAdapter();
+                        await startNewSession();
+                    } finally {
+                        this.textContent = originalText;
+                        this.style.pointerEvents = '';
+                    }
                 });
             });
         }
@@ -611,8 +875,20 @@
         }
 
         async function loadNpcModels() {
+            const CACHE_KEY = 'npc_models_cache';
+            const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+            
+            const cached = sessionStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < CACHE_TTL) {
+                    serverModels = data;
+                    return; // skip network call
+                }
+            }
+            
             try {
-                const response = await fetch(`${API_BASE}/npc-models`, { cache: 'no-cache' });
+                const response = await fetch(`${API_BASE}/npc-models`);
                 if (!response.ok) return;
                 const data = await response.json();
                 serverModels = {};
@@ -621,6 +897,11 @@
                     if (model.supabase_npc_id) serverModels[model.supabase_npc_id] = model;
                     if (model.artifact_key) serverModels[model.artifact_key] = model;
                 }
+                // Save to cache
+                sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+                    data: serverModels,
+                    timestamp: Date.now()
+                }));
             } catch (error) {
                 console.warn('Unable to load NPC model registry:', error);
             }
@@ -747,10 +1028,8 @@
             if (!message) return;
             if (isLoading) return;
 
-            // Ensure an active session is available before sending chat
-            if (!currentSessionId) {
-                await startNewSession();
-            }
+            // Ensure an active session is available before sending chat (race-condition safe)
+            await ensureSession();
 
             // Add user message to chat
             addMessage(message, 'user');
@@ -759,11 +1038,18 @@
             document.getElementById('sendBtn').disabled = true;
             isLoading = true;
 
-            // Show loading indicator
-            addMessage('', 'npc-loading');
+            // Create an empty NPC message bubble immediately
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message npc';
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            msgDiv.appendChild(contentDiv);
+            document.getElementById('messageContainer').appendChild(msgDiv);
+            trimMessageHistory();
+            requestAnimationFrame(() => scrollToBottom());
 
             try {
-                const response = await fetch(`${API_BASE}/chat`, {
+                const response = await fetchWithRetry(`${API_BASE}/chat/stream`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -779,25 +1065,23 @@
                     throw new Error(error.detail || 'Unknown error');
                 }
 
-                const data = await response.json();
-                
-                // Remove loading message
-                const messages = document.querySelectorAll('.message-loading');
-                if (messages.length > 0) {
-                    messages[messages.length - 1].remove();
-                }
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = '';
 
-                // Add NPC response
-                addMessage(data.npc_response, 'npc');
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullText += chunk;
+                    contentDiv.textContent = fullText; // update bubble in real-time
+                    requestAnimationFrame(() => scrollToBottom());
+                }
 
                 clearErrorMessage();
             } catch (error) {
-                // Remove loading message
-                const messages = document.querySelectorAll('.message-loading');
-                if (messages.length > 0) {
-                    messages[messages.length - 1].remove();
-                }
-
+                // Remove the empty NPC message bubble on error
+                msgDiv.remove();
                 showError(`Error: ${error.message}`);
             } finally {
                 input.disabled = false;
@@ -828,7 +1112,8 @@
             }
             
             container.appendChild(messageDiv);
-            container.scrollTop = container.scrollHeight;
+            trimMessageHistory(); // keep DOM lean
+            requestAnimationFrame(() => scrollToBottom()); // scroll after paint
         }
 
         function addSystemMessage(text) {
@@ -837,7 +1122,8 @@
             messageDiv.className = 'message npc';
             messageDiv.innerHTML = `<div class="message-content" style="background: #e8f4f8; color: #0066cc; font-size: 12px;">${text}</div>`;
             container.appendChild(messageDiv);
-            container.scrollTop = container.scrollHeight;
+            trimMessageHistory();
+            requestAnimationFrame(() => scrollToBottom());
         }
 
         function showError(message) {
@@ -896,11 +1182,7 @@
         // Initialize on page load
         window.addEventListener('load', initialize);
 
-        // Refresh server status frequently (every 10 seconds)
-        // This ensures quick detection of server coming online
-        setInterval(checkServerStatus, 10000);
-        
-        // Also force a check when the page regains focus
+        // Refresh server status when page regains focus
         document.addEventListener('visibilitychange', function() {
             if (!document.hidden) {
                 checkServerStatus();

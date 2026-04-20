@@ -13,7 +13,6 @@
       "tags": ["universal", "coordination", "primary"],
       "dependencies": [
         "subagent:task-manager",
-        "subagent:batch-executor",
         "subagent:documentation",
         "subagent:contextscout",
         "subagent:externalscout",
@@ -36,9 +35,8 @@
       "dependencies": [
         "subagent:documentation",
         "subagent:task-manager",
-        "subagent:batch-executor",
         "subagent:coder-agent",
-        "subagent:tester",
+        "subagent:test-engineer",
         "subagent:reviewer",
         "subagent:build-agent",
         "subagent:contextscout",
@@ -47,40 +45,6 @@
         "context:task-delegation-basics",
         "context:component-planning",
         "context:external-libraries-workflow"
-      ]
-    },
-    "repo-manager": {
-      "id": "repo-manager",
-      "name": "Repo Manager",
-      "category": "meta",
-      "type": "agent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["repository", "management", "orchestration"],
-      "dependencies": [
-        "subagent:task-manager",
-        "subagent:contextscout",
-        "subagent:documentation",
-        "subagent:coder-agent",
-        "subagent:tester",
-        "subagent:reviewer",
-        "subagent:build-agent"
-      ]
-    },
-    "system-builder": {
-      "id": "system-builder",
-      "name": "System Builder",
-      "category": "meta",
-      "type": "agent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["system-generation", "architecture", "scaffolding"],
-      "dependencies": [
-        "subagent:agent-generator",
-        "subagent:command-creator",
-        "subagent:domain-analyzer",
-        "subagent:context-organizer",
-        "subagent:workflow-designer"
       ]
     },
     "copywriter": {
@@ -141,19 +105,6 @@
         "context:task-delegation-basics"
       ]
     },
-    "batch-executor": {
-      "id": "batch-executor",
-      "name": "BatchExecutor",
-      "category": "subagents/core",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["parallel-execution", "batch-management", "coordination"],
-      "dependencies": [
-        "subagent:coder-agent",
-        "subagent:task-manager"
-      ]
-    },
     "documentation": {
       "id": "documentation",
       "name": "DocWriter",
@@ -186,26 +137,7 @@
       "tags": ["external", "documentation", "search"],
       "dependencies": []
     },
-    "context-manager": {
-      "id": "context-manager",
-      "name": "ContextManager",
-      "category": "subagents/core",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["context", "management", "organization"],
-      "dependencies": []
-    },
-    "context-retriever": {
-      "id": "context-retriever",
-      "name": "Context Retriever",
-      "category": "subagents/core",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["context", "retrieval", "search"],
-      "dependencies": []
-    },
+    
     "coder-agent": {
       "id": "coder-agent",
       "name": "CoderAgent",
@@ -218,8 +150,8 @@
         "context:standards-code"
       ]
     },
-    "tester": {
-      "id": "tester",
+    "test-engineer": {
+      "id": "test-engineer",
       "name": "TestEngineer",
       "category": "subagents/code",
       "type": "subagent",
@@ -275,36 +207,6 @@
       "tags": ["devops", "ci-cd", "infrastructure"],
       "dependencies": []
     },
-    "agent-generator": {
-      "id": "agent-generator",
-      "name": "AgentGenerator",
-      "category": "subagents/system-builder",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["generation", "agents", "scaffolding"],
-      "dependencies": []
-    },
-    "command-creator": {
-      "id": "command-creator",
-      "name": "CommandCreator",
-      "category": "subagents/system-builder",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["commands", "generation", "scaffolding"],
-      "dependencies": []
-    },
-    "domain-analyzer": {
-      "id": "domain-analyzer",
-      "name": "DomainAnalyzer",
-      "category": "subagents/system-builder",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["analysis", "domain", "architecture"],
-      "dependencies": []
-    },
     "context-organizer": {
       "id": "context-organizer",
       "name": "ContextOrganizer",
@@ -313,26 +215,6 @@
       "version": "1.0.0",
       "author": "opencode",
       "tags": ["context", "organization", "structure"],
-      "dependencies": []
-    },
-    "workflow-designer": {
-      "id": "workflow-designer",
-      "name": "WorkflowDesigner",
-      "category": "subagents/system-builder",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["workflow", "design", "architecture"],
-      "dependencies": []
-    },
-    "image-specialist": {
-      "id": "image-specialist",
-      "name": "Image Specialist",
-      "category": "subagents/utils",
-      "type": "subagent",
-      "version": "1.0.0",
-      "author": "opencode",
-      "tags": ["images", "editing", "generation"],
       "dependencies": []
     },
     "simple-responder": {

@@ -126,11 +126,11 @@ def select_max_seq_length(free_vram_gb: float, configured: int) -> int:
 DEFAULT_CONFIG = {
     # Model
     "model_name": "unsloth/Llama-3.1-8B-Instruct",
-    "max_seq_length": 1024,  # Halved context to prevent strict packing VRAM spikes
-    # LoRA (Rank-Stabilized) - based on Unsloth best practices
-    "lora_r": 16,
-    "lora_alpha": 32,  # 2x rank keeps the adapter expressive for small persona datasets
-    "lora_dropout": 0,
+    "max_seq_length": 2048,  # ↑ from 1024 — better multi-turn dialogue context
+    # LoRA (Rank-Stabilized) - Optimized for NPC persona capture
+    "lora_r": 32,  # ↑ from 16 — richer persona expression
+    "lora_alpha": 64,  # ↑ from 32 — 2x rank for stable scaling
+    "lora_dropout": 0.05,  # ↑ from 0 — prevent phrase memorization
     "use_rslora": True,  # Rank-stabilized LoRA for higher ranks
     "target_modules": [
         "q_proj",
@@ -143,16 +143,16 @@ DEFAULT_CONFIG = {
     ],
     # Training (Optimized for consumer GPU)
     "batch_size": 1,
-    "gradient_accumulation_steps": 8,  # Effective batch = 8
-    "learning_rate": 2e-4,  # Educational roleplay QLoRA default
-    "num_train_epochs": 2,
-    "warmup_steps": 10,
-    "weight_decay": 0.01,
-    "neftune_noise_alpha": 5.0,  # Improve generalization
-    # OPTIMIZATION: Improved LR scheduler and training options
-    "lr_scheduler_type": "linear",  # Stable predictable decay without catastrophic forgetting
+    "gradient_accumulation_steps": 16,  # ↑ from 8 — smoother gradient estimates
+    "learning_rate": 1e-4,  # ↓ from 2e-4 — safer with higher rank
+    "num_train_epochs": 3,  # ↑ from 2 — solidify character voice
+    "warmup_steps": 20,  # ↑ from 10 — prevent early gradient instability
+    "weight_decay": 0.03,  # ↑ from 0.01 — better regularization, less "scripted" feel
+    "neftune_noise_alpha": 7.5,  # ↑ from 5.0 — better generalization to novel player inputs
+    # OPTIMIZATION: Improved LR scheduler (cosine for smoother decay)
+    "lr_scheduler_type": "cosine",  # ← from "linear" — smoother late-epoch learning
     "lr_cycles": 0.5,  # Half-cycle cosine for faster convergence
-    "lr_min_ratio": 0.1,  # Min LR as fraction of max
+    "lr_min_ratio": 0.05,  # ↓ from 0.1 — decay further at end for clean convergence
     # Packing - pack sequences to max_seq_length for efficiency
     # NOTE: Disable for small datasets (<500 samples) to avoid OOM on 6GB VRAM
     "packing": False,
@@ -166,9 +166,9 @@ DEFAULT_CONFIG = {
     "eval_steps": 50,
     "save_steps": 50,
     "save_total_limit": 2,
-    # Early stopping
-    "early_stopping_patience": 3,
-    "early_stopping_threshold": 0.001,
+    # Early stopping (tighter for better persona consistency)
+    "early_stopping_patience": 4,  # ↑ from 3 — NPC dialogue loss can plateau before improving
+    "early_stopping_threshold": 0.005,  # ↑ from 0.001 — tighter stopping
     # Optimization
     "optim": "paged_adamw_8bit",  # Perfect for 6GB (pages to RAM if VRAM spikes)
     "use_gradient_checkpointing": "unsloth",
@@ -186,14 +186,14 @@ DEFAULT_CONFIG = {
 
 # Small-dataset overrides (auto-applied when training samples < 500)
 SMALL_DATASET_OVERRIDES = {
-    "num_train_epochs": 2,              # Down from 3 — prevents memorization
-    "warmup_steps": 5,                  # Down from 10 — proportional to data size
-    "neftune_noise_alpha": 7.0,         # Up from 5.0 — extra regularization
-    "eval_steps": 25,                   # Down from 100 — more frequent monitoring
+    "num_train_epochs": 2,              # ↓ from 3 — prevents memorization
+    "warmup_steps": 5,                  # ↓ from 20 — proportional to data size
+    "neftune_noise_alpha": 7.0,         # Keep — extra regularization for small data
+    "eval_steps": 25,                   # ↓ from 50 — more frequent monitoring
     "save_steps": 25,                   # Match eval frequency
-    "early_stopping_patience": 5,       # Up from 3 — more patience with tiny data
-    "gradient_accumulation_steps": 4,   # Down from 8 — more updates per epoch
-    "weight_decay": 0.05,               # Up from 0.01 — extra regularization
+    "early_stopping_patience": 5,       # ↑ from 4 — more patience with tiny data
+    "gradient_accumulation_steps": 4,   # ↓ from 16 — more updates per epoch
+    "weight_decay": 0.05,               # ↑ from 0.03 — extra regularization
 }
 
 # ==============================================================================
@@ -562,7 +562,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--quality-threshold",
         type=float,
-        default=0.0,
+        default=DEFAULT_CONFIG["quality_threshold"],
         help="Filter samples by quality (0.0 = no filter, 0.7 = quality >= 0.7)",
     )
 

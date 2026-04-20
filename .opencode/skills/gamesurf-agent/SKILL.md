@@ -62,6 +62,11 @@ cd /root/Game_Surf/Tools/LLM_WSL
 bash scripts/start_servers.sh  # Starts chat-server (8080) and llm-server (8000)
 ```
 
+**Troubleshooting:**
+- If LLM server fails to start, check PYTHONPATH is set: `PYTHONPATH=/root/Game_Surf/Tools/LLM_WSL:$PYTHONPATH`
+- Server needs ~40 seconds to load the model - be patient after starting
+- Check status: `curl http://127.0.0.1:8000/status`
+
 ### Run Full NPC Pipeline
 ```bash
 cd /root/Game_Surf/Tools/LLM_WSL
@@ -165,3 +170,83 @@ For context, read these memories:
 - Chat UI: `chat_interface.html`
 - Supabase docs: `docs/SUPABASE_INTEGRATION.md`
 - Pipeline docs: `docs/PIPELINE_REFERENCE.md`
+
+---
+
+## Troubleshooting Guide
+
+### Server Issues
+
+**Problem**: LLM server fails to start with `ModuleNotFoundError: No module named 'scripts.supabase_client'`
+
+**Solution**: Set PYTHONPATH before starting:
+```bash
+export PYTHONPATH=/root/Game_Surf/Tools/LLM_WSL:$PYTHONPATH
+# Or use start_servers.sh which handles this automatically
+```
+
+**Problem**: Chat interface shows "Uncaught SyntaxError: Identifier 'supabase' has already been declared"
+
+**Solution**: The Supabase CDN declares a global `supabase` variable. Rename the local variable to `supabaseClient` in `chat_interface.html`:
+```javascript
+let supabaseClient = null;  // Instead of: let supabase = null
+```
+
+**Problem**: LLM server takes too long to respond or times out
+
+**Solution**: Model needs ~40 seconds to load. The server is working - just wait. Check with:
+```bash
+curl http://127.0.0.1:8000/status
+```
+
+---
+
+### Dataset Generation Issues
+
+**Problem**: NotebookLM returns single JSON object instead of JSONL
+
+**Solution**: Parse the response - the JSONL is in the `answer` field:
+```python
+import json
+with open('research/<npc>/notebooklm_batch_01.jsonl', 'r') as f:
+    data = json.loads(f.read().strip())
+# Save the answer field as the actual JSONL file
+with open('research/<npc>/notebooklm_batch_01_fixed.jsonl', 'w') as f:
+    f.write(data['answer'])
+```
+
+**Problem**: Import fails with "messages must contain exactly 3 entries"
+
+**Solution**: The JSONL file wasn't properly formatted. After fixing above, run import with the corrected file.
+
+---
+
+### Pipeline Issues
+
+**Problem**: Pipeline can't find prepared dataset
+
+**Solution**: Folder naming matters. Pipeline expects:
+- `datasets/processed/<npc_id>_dataset/` (NOT `datasets/processed/<npc_id>/`)
+- Files: `train.jsonl`, `validation.jsonl`, `test.jsonl`
+
+---
+
+### Chat Interface Issues
+
+**Problem**: Chat interface can't connect to LLM server
+
+**Solution**: Ensure both servers are running:
+```bash
+# Check ports
+ss -tlnp | grep -E "8080|8000"
+
+# Check status
+curl http://127.0.0.1:8000/status
+curl http://127.0.0.1:8080/chat_interface.html
+```
+
+**Problem**: NPC doesn't appear in chat interface dropdown
+
+**Solution**: Add to both:
+1. `npcNames` object in chat_interface.html
+2. NPC selector div in chat_interface.html

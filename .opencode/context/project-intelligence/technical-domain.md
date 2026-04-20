@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 1.1 | Updated: 2026-04-19 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 1.2 | Updated: 2026-04-20 -->
 
 # Technical Domain
 
@@ -129,8 +129,95 @@ Monitoring: N/A (local training)
 **Dataset Generation**: `scripts/generate_npc_dataset.py` - NotebookLM → JSONL
 **Export**: `scripts/convert_lora_to_gguf.py` - LoRA → GGUF
 **Chat Server**: `run_chat_server.py` - Local LLM inference server
-**Supabase**: `supabase/` - Database migrations & Edge Functions
+**Supabase**: `scripts/supabase_client.py` - Database client (419 lines)
 **Tests**: `test_server.py`, `test_memory_workflow.py`
+
+## Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| Files (Python) | snake_case | `train_surf_llama.py`, `supabase_client.py` |
+| Files (Scripts) | snake_case | `run_full_npc_pipeline.py` |
+| NPC IDs | kebab-case | `maestro_jazz_instructor`, `brazilian_history` |
+| Classes | PascalCase | `SupabaseClient`, `PlayerProfile`, `NPCMemory` |
+| Functions | snake_case | `get_player_profile()`, `check_vram_guard()` |
+| Constants | UPPER_SNAKE | `MAX_EPOCHS`, `DEFAULT_BATCH_SIZE` |
+| Database Tables | snake_case | `player_profiles`, `dialogue_sessions` |
+| Database Columns | snake_case | `player_id`, `npc_id`, `started_at` |
+
+## Code Standards
+
+**Python Style**:
+- Follow PEP 8, use Black formatter
+- Type hints required for function signatures
+- Use dataclasses for data structures
+- Docstrings for all public functions
+
+**Project Patterns**:
+```python
+# Dataclass pattern (from supabase_client.py)
+@dataclass
+class PlayerProfile:
+    player_id: str
+    display_name: str
+    created_at: datetime
+    updated_at: datetime
+
+# Singleton pattern for clients
+class SupabaseClient:
+    _instance: Optional[Client] = None
+    
+    @classmethod
+    def get_instance(cls) -> Optional[Client]:
+        if cls._instance is not None:
+            return cls._instance
+        # ... initialization
+
+# VRAM guard before GPU operations
+def check_vram_guard(threshold_gb: float = 3.5) -> None:
+    """Check if enough VRAM is free before heavy tasks."""
+    if not torch.cuda.is_available():
+        return
+    free_bytes, total_bytes = torch.cuda.mem_get_info()
+    # ... warning logic
+```
+
+**Required Imports**:
+```python
+from __future__ import annotations  # Always include
+from pathlib import Path
+from typing import Any, Optional
+```
+
+## Security Requirements
+
+| Requirement | Implementation | Location |
+|-------------|---------------|----------|
+| API Keys | Environment variables only, never hardcoded | `.env` file |
+| Supabase Auth | Service role key for server, anon key for client | `scripts/supabase_client.py` |
+| Input Validation | Zod-like validation before DB operations | Per-function |
+| Query Safety | Parameterized queries via Supabase client | All DB queries |
+| Secrets | Never commit `.env` to git | `.gitignore` |
+
+**Environment Variable Pattern**:
+```python
+def get_config() -> tuple[str, str, bool]:
+    env = load_env_file(ROOT / ".env")
+    url = os.environ.get("SUPABASE_URL") or env.get("SUPABASE_URL", "http://127.0.0.1:16433")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or env.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    enabled = os.environ.get("ENABLE_SUPABASE", "true").lower() == "true"
+    return url, key, enabled
+```
+
+**Required .gitignore entries**:
+```
+.env
+*.gguf
+exports/
+datasets/processed/
+__pycache__/
+*.pyc
+```
 
 ## Related Files
 

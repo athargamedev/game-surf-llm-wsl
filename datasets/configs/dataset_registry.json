@@ -68,6 +68,28 @@
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - Professor LoRA"
+    },
+    {
+      "name": "supabase_instructor_dataset",
+      "path": "datasets/personas/supabase_instructor/supabase_instructor_dataset.jsonl",
+      "task_type": "mixed",
+      "npc_scope": "instructor",
+      "format": "chatml",
+      "sample_count": 48,
+      "weight": 1.0,
+      "source_kind": "notebooklm_direct",
+      "_note": "Imported from NotebookLM direct JSONL - Professor Supabase"
+    },
+    {
+      "name": "ai_news_instructor_dataset",
+      "path": "datasets/personas/ai_news_instructor/ai_news_instructor_dataset.jsonl",
+      "task_type": "mixed",
+      "npc_scope": "instructor",
+      "format": "chatml",
+      "sample_count": 42,
+      "weight": 1.0,
+      "source_kind": "notebooklm_direct",
+      "_note": "Imported from NotebookLM direct JSONL - AI News Analyst"
     }
   ]
 }

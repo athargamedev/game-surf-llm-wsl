@@ -1,37 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "filesystem": {
-      "command": [
-        "cmd",
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "D:\\GithubRepos\\Game_Surf"
-      ],
-      "enabled": true,
-      "timeout": 30000,
-      "type": "local"
-    },
-    "sequentialthinking": {
-      "command": [
-        "cmd",
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
-      "enabled": true,
-      "timeout": 50000,
-      "type": "local"
-    },
-    "serena": {
-      "type": "local",
-      "command": ["uvx", "--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"],
-      "args": ["--context", "codex", "--project-from-cwd"],
-      "enabled": true
-    },
     "supabase": {
       "enabled": true,
       "type": "remote",

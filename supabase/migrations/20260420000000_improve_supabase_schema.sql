@@ -444,12 +444,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ==========================================
 -- PART 5: MIGRATION LOG
--- ==========================================
-
--- Log migration completion
-INSERT INTO schema_migrations (version, name) 
-VALUES ('20260420000000', 'improve_supabase_schema')
-ON CONFLICT (version) DO NOTHING;
+-- ===========================================
 
 DO $$
 BEGIN

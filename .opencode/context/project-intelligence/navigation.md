@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: critical | Version: 1.1 | Updated: 2026-04-19 -->
+<!-- Context: project-intelligence/nav | Priority: critical | Version: 1.2 | Updated: 2026-04-20 -->
 
 # Project Intelligence
 
@@ -11,6 +11,8 @@
 ├── navigation.md              # This file - quick overview
 ├── business-domain.md         # Business context and problem statement
 ├── technical-domain.md        # Stack, architecture, technical decisions
+├── code-standards.md          # Python patterns, naming, security (NEW)
+├── supabase-patterns.md       # Database patterns, memory workflow (NEW)
 ├── business-tech-bridge.md    # How business needs map to solutions
 ├── decisions-log.md           # Major decisions with rationale
 └── living-notes.md            # Active issues, debt, open questions
@@ -22,6 +24,8 @@
 |------|-------------|----------|
 | `business-domain.md` | Problem, users, value proposition | high |
 | `technical-domain.md` | Stack, architecture, integrations | **critical** |
+| `code-standards.md` | Python patterns, naming, security | **critical** |
+| `supabase-patterns.md` | Database patterns, memory workflow | high |
 | `business-tech-bridge.md` | Business → technical mapping | high |
 | `decisions-log.md` | Why decisions were made | medium |
 | `living-notes.md` | Active issues and open questions | medium |
