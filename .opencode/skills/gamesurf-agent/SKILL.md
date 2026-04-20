@@ -33,15 +33,16 @@ Always use these paths:
 
 ## Registered NPCs
 
-Currently available (6):
-| NPC ID | Display Name | Subject |
-|-------|-----------|---------|
-| maestro_jazz_instructor | The Maestro | Jazz History |
-| kosmos_instructor | Professor Kosmos | Greek Mythology |
-| llm_instructor | Professor LoRA | LoRA Fine-tuning |
-| brazilian_history | Professor Pedro | Brazilian History |
-| marvel_comics_instructor | MarvelOracle | Marvel Comics |
-| movies_instructor | Professor Reel | Cinema/Film Studies |
+Currently available (7):
+| NPC ID | Display Name | Subject | Status |
+|-------|-----------|---------|-------|
+| maestro_jazz_instructor | The Maestro | Jazz History | Trained |
+| kosmos_instructor | Professor Kosmos | Greek Mythology | Trained |
+| llm_instructor | Professor LoRA | LoRA Fine-tuning | Trained |
+| brazilian_history | Professor Pedro | Brazilian History | Trained |
+| marvel_comics_instructor | MarvelOracle | Marvel Comics | **Trained** ✅ |
+| movies_instructor | Professor Reel | Cinema/Film Studies | Trained |
+| supabase_instructor | Supabase Guide | Supabase | Trained |
 
 ## Core Skills Available
 
@@ -67,10 +68,33 @@ bash scripts/start_servers.sh  # Starts chat-server (8080) and llm-server (8000)
 - Server needs ~40 seconds to load the model - be patient after starting
 - Check status: `curl http://127.0.0.1:8000/status`
 
-### Run Full NPC Pipeline
+### Train NPC (Direct Method - Recommended)
 ```bash
-cd /root/Game_Surf/Tools/LLM_WSL
-./run_pipeline.sh --npc <npc_id> --skip-generation
+source /root/miniforge3/etc/profile.d/conda.sh && conda activate unsloth_env
+
+# Step 1: Prepare dataset (if raw JSONL exists)
+python scripts/prepare_dataset.py \
+  --input datasets/personas/<npc_id>/<npc_id>_dataset.jsonl \
+  --output datasets/processed/<npc_id>_dataset \
+  --npc-scope instructor \
+  --task-type teaching
+
+# Step 2: Train with explicit file paths (avoids dataset lookup issues)
+python scripts/train_surf_llama.py \
+  --model-name unsloth/Llama-3.2-3B-Instruct \
+  --train-file datasets/processed/<npc_id>_dataset/train.jsonl \
+  --val-file datasets/processed/<npc_id>_dataset/validation.jsonl \
+  --npc-key <npc_id> \
+  --num-train-epochs 3
+
+# Step 3: Move model to proper location
+mkdir -p exports/npc_models/<npc_id>/checkpoints
+cp exports/surf_llama3b/lora_adapter/* exports/npc_models/<npc_id>/
+cp exports/surf_llama3b/checkpoints/training_report.json exports/npc_models/<npc_id>/checkpoints/
+cp exports/surf_llama3b/run_config.json exports/npc_models/<npc_id>/
+
+# Step 4: Log metrics
+python scripts/training_metrics.py log <npc_id>
 ```
 
 ### Generate Dataset
@@ -164,6 +188,25 @@ For context, read these memories:
 - `suggested_commands` - Common commands
 - `tech_stack` - Technology stack
 
+## Training Metrics
+
+Track improvements over time:
+```bash
+python scripts/training_metrics.py history  # Show all NPCs
+python scripts/training_metrics.py compare <npc_id>  # Compare last 2 runs
+```
+
+**Current Best Eval Losses** (lower is better):
+| NPC | Eval Loss |
+|-----|----------|
+| marvel_comics_instructor | 1.817 |
+| supabase_instructor | 1.854 |
+| ai_news_instructor | 1.834 |
+| llm_instructor | 1.926 |
+| movies_instructor | 2.180 |
+| greek_mythology_instructor | 2.144 |
+| jazz_history_instructor | 2.292 |
+
 ## References
 
 - NPC profiles: `datasets/configs/npc_profiles.json`
@@ -205,14 +248,38 @@ curl http://127.0.0.1:8000/status
 
 **Problem**: NotebookLM returns single JSON object instead of JSONL
 
-**Solution**: Parse the response - the JSONL is in the `answer` field:
+**Solution**: Parse the response - the JSONL is in the `answer` field. The output comes as MULTIPLE JSON objects concatenated:
 ```python
 import json
-with open('research/<npc>/notebooklm_batch_01.jsonl', 'r') as f:
-    data = json.loads(f.read().strip())
-# Save the answer field as the actual JSONL file
-with open('research/<npc>/notebooklm_batch_01_fixed.jsonl', 'w') as f:
-    f.write(data['answer'])
+
+# Read the nested output
+with open('research/<npc>/notebooklm_batch_02.jsonl', 'r') as f:
+    data = json.loads(f.read())
+answer = data['answer']
+
+# Parse line by line (each line is a separate JSON object)
+lines = answer.strip().split('\n')
+valid_lines = []
+for line in lines:
+    if line.strip():
+        try:
+            obj = json.loads(line)
+            if 'messages' in obj and len(obj['messages']) == 3:
+                valid_lines.append(line)
+        except:
+            pass
+
+print(f'Extracted {len(valid_lines)} valid examples')
+
+# Save to file
+with open('research/<npc>/<npc>_extracted.jsonl', 'w') as f:
+    f.write('\n'.join(valid_lines))
+```
+
+Then copy to persona dataset folder:
+```bash
+mkdir -p datasets/personas/<npc_id>/
+cp research/<npc>/<npc>_extracted.jsonl datasets/personas/<npc_id>/<npc_id>_dataset.jsonl
 ```
 
 **Problem**: Import fails with "messages must contain exactly 3 entries"
@@ -228,6 +295,21 @@ with open('research/<npc>/notebooklm_batch_01_fixed.jsonl', 'w') as f:
 **Solution**: Folder naming matters. Pipeline expects:
 - `datasets/processed/<npc_id>_dataset/` (NOT `datasets/processed/<npc_id>/`)
 - Files: `train.jsonl`, `validation.jsonl`, `test.jsonl`
+
+**Problem**: Training fails with "Some modules are dispatched on the CPU or disk"
+
+**Solution**: The 8B model is too large for the 6GB RTX 3060. Use the 3B model:
+```bash
+--model-name unsloth/Llama-3.2-3B-Instruct
+```
+
+**Problem**: Training fails to find dataset by name
+
+**Solution**: Use explicit file paths instead of `--datasets`:
+```bash
+--train-file datasets/processed/<npc_id>_dataset/train.jsonl \
+--val-file datasets/processed/<npc_id>_dataset/validation.jsonl \
+```
 
 ---
 

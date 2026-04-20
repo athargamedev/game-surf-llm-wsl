@@ -1163,14 +1163,86 @@ class TrainingReportCallback(TrainerCallback):
 
 
 def load_model_and_tokenizer(args: argparse.Namespace, max_seq_length: int):
-    """Load model and tokenizer with validation and LoRA PEFT setup."""
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=args.model_name,
-        max_seq_length=max_seq_length,
-        dtype=None,
-        load_in_4bit=True,
-    )
+    """Load model and tokenizer with validation and LoRA PEFT setup.
+    
+    Three-tier fallback strategy for limited VRAM (6GB):
+      1. float16 on GPU (5GB limit) - best quality
+      2. 4-bit on GPU (4GB limit) - good quality  
+      3. 4-bit with CPU offload - maximum compatibility
+    """
+    import torch
+    import gc
+    
+    # Tier 1: float16 without quantization
+    print("  [Loading] Tier 1: float16 on GPU (5GB limit)...")
+    try:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=args.model_name,
+            max_seq_length=max_seq_length,
+            dtype=torch.float16,
+            load_in_4bit=False,
+            device_map="auto",
+            max_memory={0: "5GB"},
+        )
+        print("  [OK] Tier 1 succeeded (float16)")
+        return _finish_model_setup(model, tokenizer, args)
+    except Exception as e:
+        print(f"  [WARN] Tier 1 failed: {e}")
+        gc.collect()
+        torch.cuda.empty_cache()
+    
+    # Tier 2: 4-bit quantization on GPU
+    print("  [Loading] Tier 2: 4-bit on GPU (4GB limit)...")
+    try:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=args.model_name,
+            max_seq_length=max_seq_length,
+            dtype=torch.float16,
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+            device_map="auto",
+            max_memory={0: "4GB"},
+        )
+        print("  [OK] Tier 2 succeeded (4-bit)")
+        return _finish_model_setup(model, tokenizer, args)
+    except Exception as e:
+        print(f"  [WARN] Tier 2 failed: {e}")
+        gc.collect()
+        torch.cuda.empty_cache()
+    
+    # Tier 3: 4-bit with CPU offload (device_map="balanced" spreads across GPU+CPU)
+    print("  [Loading] Tier 3: 4-bit with CPU offload (balanced)...")
+    try:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=args.model_name,
+            max_seq_length=max_seq_length,
+            dtype=torch.float16,
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+            device_map="balanced",  # Spreads layers across GPU + CPU RAM
+            max_memory={0: "2GB", "cpu": "30GB"},  # Keep only 2GB on GPU
+            offload_folder="outputs/offload",
+            offload_state_dir="outputs/offload",
+        )
+        print("  [OK] Tier 3 succeeded (4-bit + CPU offload)")
+        return _finish_model_setup(model, tokenizer, args)
+    except Exception as e:
+        print(f"  [ERROR] All tiers failed: {e}")
+        raise RuntimeError(
+            "Model loading failed on all tiers. Try:\n"
+            "  1. Close other GPU apps (LM Studio, Docker, etc.)\n"
+            "  2. Reduce max_seq_length\n"
+            "  3. Use a smaller base model (e.g., Llama-3.2-3B)"
+        )
 
+
+def _finish_model_setup(model, tokenizer, args):
+    """Common post-loading model/tokenizer setup."""
+    import torch
+    from unsloth import get_chat_template
+    
     tokenizer = get_chat_template(tokenizer, chat_template="llama-3.2")
 
     assert tokenizer.pad_token_id is not None, \
