@@ -1,0 +1,27 @@
+{
+  "name": "npc-model-tuning",
+  "description": "Game_Surf local LLM training workflow in WSL: manage LM Studio models, test inference, tune generation, run Unsloth fine-tuning, evaluate outputs.",
+  "short_description": "Tune and train local NPC LLMs in WSL",
+  "commands": {
+    "lm_list": "python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-list",
+    "lm_download": "python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-download <model_id>",
+    "lm_load": "python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-load <model_id>",
+    "test_connection": "conda run --no-capture-output -n unsloth_env python .codex/skills/npc-model-tuning/scripts/tune_model.py test-connection --model <model_id>",
+    "tune_npc": "python .codex/skills/npc-model-tuning/scripts/tune_model.py tune --npc <npc> --temp <temp> --tokens <tokens>",
+    "generate_dataset": "conda run --no-capture-output -n unsloth_env python scripts/generate_npc_dataset.py --npc <npc> --target-count <count> --batch-size 1 --skip-research",
+    "train": "./run_pipeline.sh --npc <npc> --target-count 200 --epochs 3",
+    "run_pipeline": "./run_pipeline.sh --npc <npc> --skip-generation",
+    "sync_artifacts": "conda run --no-capture-output -n unsloth_env python scripts/sync_runtime_artifacts.py",
+    "start_server": "conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
+  },
+  "prerequisites": [
+    "nvidia-smi",
+    "conda info --envs",
+    "python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-list"
+  ],
+  "references": {
+    "setup_guide": "docs/SETUP_GUIDE.md",
+    "pipeline_reference": "docs/PIPELINE_REFERENCE.md",
+    "architecture": "docs/ARCHITECTURE.md"
+  }
+}

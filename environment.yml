@@ -1,0 +1,35 @@
+name: unsloth_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - cmake
+  - git
+  - ninja
+  - pip:
+      - unsloth
+      - transformers
+      - datasets
+      - accelerate
+      - safetensors
+      - trl
+      - sentencepiece
+      - tokenizers
+      - numpy
+      - gguf
+      - mistral-common
+      - huggingface-hub
+      - fastapi
+      - uvicorn
+      - pydantic
+      - openai
+      - langchain
+      - langchain-community
+      - llama-cpp-python
+      - llama-index
+      - llama-index-embeddings-huggingface
+      - llama-index-llms-llama-cpp
+      - supabase
+      - streamlit
+      - pandas

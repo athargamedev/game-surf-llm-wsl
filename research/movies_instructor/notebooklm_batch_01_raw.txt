@@ -1,0 +1,8 @@
+21:06:01 WARNING [notebooklm._chat] No answer extracted from response (6 lines parsed)
+{
+  "answer": "",
+  "conversation_id": "1628107e-8fee-48e4-adb8-34061ab7742e",
+  "turn_number": 0,
+  "is_follow_up": true,
+  "references": []
+}

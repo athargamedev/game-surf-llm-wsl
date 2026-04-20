@@ -1,0 +1,34 @@
+Skipping import of cpp extensions due to incompatible torch version. Please upgrade to torch >= 2.11.0 (found 2.10.0+cu128).
+/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py:714: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [47320]
+INFO:     Waiting for application startup.
+Connected to Supabase at http://127.0.0.1:16433
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 2011.97it/s]
+[1mBertModel LOAD REPORT[0m from: BAAI/bge-small-en-v1.5
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+llama_context: n_ctx_seq (2048) < n_ctx_train (131072) -- the full capacity of the model will not be utilized
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Loaded embedding model: BAAI/bge-small-en-v1.5
+Loaded model: exports/training_test_export/gguf_gguf/llama-3.2-3b-instruct.Q4_K_M.gguf
+Loaded LlamaIndex from: datasets/indexes/world_lore
+Auto-enqueued initial graph rebuild (fuzzy=True, semantic=False)
+Started graph refresh scheduler (interval=1800s)
+INFO:     127.0.0.1:47412 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:47416 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:47416 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47320]

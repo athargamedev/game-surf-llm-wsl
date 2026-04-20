@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game_Surf NPC Chat Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            height: 80vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar-section h3 {
+            color: #667eea;
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .status-card {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            border-left: 3px solid #667eea;
+        }
+
+        .status-card .label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .status-card .value {
+            color: #333;
+            margin-top: 4px;
+        }
+
+        .status-card.error {
+            border-left-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .status-badge.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .npc-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .npc-option {
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+            text-align: center;
+            font-weight: 500;
+            color: #333;
+            font-size: 13px;
+        }
+
+        .npc-option:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .npc-option.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .dataset-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .dataset-info {
+            background: #f0f4ff;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        /* Main Chat Area */
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .chat-header h2 {
+            color: #333;
+            font-size: 20px;
+        }
+
+        .chat-header .subtitle {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 10px 0;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.npc .message-content {
+            background: #f0f0f0;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-loading .message-content {
+            background: #f0f0f0;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+            30% {
+                opacity: 1;
+                transform: translateY(-10px);
+            }
+        }
+
+        /* Input Area */
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .chat-input:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: #fff5f5;
+            color: #c53030;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 3px solid #ff6b6b;
+            font-size: 13px;
+        }
+
+        .success-message {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 3px solid #22c55e;
+            font-size: 13px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .control-btn {
+            flex: 1;
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: #e9ecef;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .sidebar {
+                height: auto;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+        }
+
+        /* Scrollbar styling */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Server Status -->
+            <div class="sidebar-section">
+                <h3>Server Status</h3>
+                <div class="status-card" id="statusCard">
+                    <div class="label">Connecting...</div>
+                </div>
+            </div>
+
+            <!-- Player Profile -->
+            <div class="sidebar-section">
+                <h3>Player Profile</h3>
+                <div style="margin-bottom: 10px;">
+                    <input 
+                        type="text" 
+                        class="chat-input" 
+                        id="playerNameInput" 
+                        placeholder="Enter your name..."
+                        style="width: 100%; margin-bottom: 8px;"
+                        onkeypress="handlePlayerNameKeyPress(event)"
+                    >
+                    <button class="control-btn" onclick="updatePlayerName()" style="width: 100%;">Set Player Name</button>
+                </div>
+                <div class="dataset-info">
+                    <strong>Current Player:</strong>
+                    <div id="currentPlayerDisplay">Loading...</div>
+                </div>
+            </div>
+
+            <!-- NPC Selection -->
+            <div class="sidebar-section">
+                <h3>Select NPC</h3>
+                <div class="npc-selector">
+                    <div class="npc-option active" data-npc="maestro_jazz_instructor">
+                        🎷 Jazz Historian
+                    </div>
+                    <div class="npc-option" data-npc="kosmos_instructor">
+                        ⚡ Greek Mythology
+                    </div>
+                    <div class="npc-option" data-npc="llm_instructor">
+                        🤖 LoRA Instructor
+                    </div>
+                    <div class="npc-option" data-npc="brazilian_history">
+                        🇧🇷 Brazil History
+                    </div>
+                    <div class="npc-option" data-npc="marvel_comics_instructor">
+                        🦸 Marvel Comics
+                    </div>
+                    <div class="npc-option" data-npc="movies_instructor">
+                        🎬 Movies Instructor
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dataset Info -->
+            <div class="sidebar-section">
+                <h3>Dataset Info</h3>
+                <div class="dataset-info">
+                    <strong>Selected:</strong>
+                    <div id="selectedDataset">Jazz History</div>
+                    <div style="margin-top: 8px;">
+                        <strong>Status:</strong>
+                        <div id="datasetStatus">Ready</div>
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <strong>Model File:</strong>
+                        <div id="npcModelFile" style="font-size: 10px; word-break: break-all;">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="sidebar-section">
+                <div class="controls">
+                    <button class="control-btn" onclick="clearChat()">Clear Chat</button>
+                    <button class="control-btn" onclick="resetRuntimeCache()">Reset Runtime Cache</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>Chat with NPC</h2>
+                <div class="subtitle">Shared base model with selectable NPC adapters and Supabase memory</div>
+            </div>
+
+            <div id="messageContainer" class="chat-messages">
+                <div class="message npc">
+                    <div class="message-content">
+                        👋 Select an NPC, set a player name, and ask about that topic.
+                    </div>
+                </div>
+            </div>
+
+            <div id="errorContainer"></div>
+
+            <div class="chat-input-area">
+                <input 
+                    type="text" 
+                    class="chat-input" 
+                    id="chatInput" 
+                    placeholder="Type your message here..."
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        let currentNpc = 'maestro_jazz_instructor';
+        let currentPlayerId = localStorage.getItem('game_surf_player_id') || 'web_player_' + Math.random().toString(36).substr(2, 9);
+        let currentPlayerName = localStorage.getItem('game_surf_player_name') || '';
+        let currentSessionId = null;
+        let isLoading = false;
+        let serverModels = {};
+        localStorage.setItem('game_surf_player_id', currentPlayerId);
+
+        const npcNames = {
+            'maestro_jazz_instructor': 'The Maestro',
+            'kosmos_instructor': 'Professor Kosmos',
+            'llm_instructor': 'Professor LoRA',
+            'brazilian_history': 'Professor Pedro',
+            'marvel_comics_instructor': 'Marvel Comics Instructor',
+            'movies_instructor': 'Professor Reel'
+        };
+
+        // Initialize
+        async function initialize() {
+            setupNpcSelection();
+            setupPlayerNameInput();
+            updatePlayerDisplay();
+            await loadNpcModels();
+            updateDatasetInfo();
+            // Force initial status check with no caching
+            await checkServerStatus();
+            // Try again after a short delay if initial check failed
+            setTimeout(checkServerStatus, 1000);
+            await startNewSession();
+        }
+
+        function setupNpcSelection() {
+            document.querySelectorAll('.npc-option').forEach(option => {
+                option.addEventListener('click', async function() {
+                    const previousNpc = currentNpc;
+                    await endCurrentSession(false, previousNpc);
+                    document.querySelectorAll('.npc-option').forEach(o => o.classList.remove('active'));
+                    this.classList.add('active');
+                    currentNpc = this.dataset.npc;
+                    updateDatasetInfo();
+                    await selectNpcAdapter();
+                    await startNewSession();
+                });
+            });
+        }
+
+        function setupPlayerNameInput() {
+            const input = document.getElementById('playerNameInput');
+            if (currentPlayerName) {
+                input.value = currentPlayerName;
+            }
+        }
+
+        function updatePlayerDisplay() {
+            const display = document.getElementById('currentPlayerDisplay');
+            if (currentPlayerName) {
+                display.textContent = currentPlayerName;
+            } else {
+                display.textContent = 'Anonymous Player';
+            }
+        }
+
+        async function updatePlayerName() {
+            const input = document.getElementById('playerNameInput');
+            const newName = input.value.trim();
+            
+            if (!newName) {
+                showError('Please enter a player name');
+                return;
+            }
+
+            // Generate new player ID if name changed
+            const oldName = currentPlayerName;
+            if (newName !== oldName) {
+                currentPlayerName = newName;
+                currentPlayerId = 'player_' + newName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).substr(2, 4);
+                
+                // Save to localStorage
+                localStorage.setItem('game_surf_player_name', currentPlayerName);
+                localStorage.setItem('game_surf_player_id', currentPlayerId);
+                
+                updatePlayerDisplay();
+                addSystemMessage(`👤 Switched to player: ${currentPlayerName}`);
+                
+                // Start new session with new player
+                await startNewSession();
+            }
+        }
+
+        function updateDatasetInfo() {
+            document.getElementById('selectedDataset').textContent = npcNames[currentNpc] || currentNpc;
+            document.getElementById('datasetStatus').textContent = 'Ready';
+            updateNpcModelFile();
+        }
+
+        function updateNpcModelFile() {
+            const fileDisplay = document.getElementById('npcModelFile');
+            const model = serverModels[currentNpc];
+            if (model?.adapter_path) {
+                fileDisplay.textContent = `LoRA: ${model.adapter_path}`;
+            } else if (model?.gguf_path) {
+                fileDisplay.textContent = `Dedicated GGUF: ${model.gguf_path}`;
+            } else {
+                fileDisplay.textContent = 'Base model only';
+            }
+        }
+
+        async function loadNpcModels() {
+            try {
+                const response = await fetch(`${API_BASE}/npc-models`, { cache: 'no-cache' });
+                if (!response.ok) return;
+                const data = await response.json();
+                serverModels = {};
+                for (const model of data.models || []) {
+                    if (model.npc_key) serverModels[model.npc_key] = model;
+                    if (model.supabase_npc_id) serverModels[model.supabase_npc_id] = model;
+                    if (model.artifact_key) serverModels[model.artifact_key] = model;
+                }
+            } catch (error) {
+                console.warn('Unable to load NPC model registry:', error);
+            }
+        }
+
+        async function selectNpcAdapter() {
+            try {
+                const response = await fetch(`${API_BASE}/reload-model`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ npc_id: currentNpc })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.loaded) {
+                    throw new Error(data.error || data.detail || 'Unable to select NPC adapter');
+                }
+                await checkServerStatus();
+            } catch (error) {
+                showError(`Adapter selection failed: ${error.message}`);
+            }
+        }
+
+        async function checkServerStatus() {
+            try {
+                // Add cache-busting parameter and no-cache headers
+                const timestamp = new Date().getTime();
+                const response = await fetch(`${API_BASE}/status?t=${timestamp}`, {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                let statusHtml = `
+                    <div class="label">Server Status</div>
+                    <div class="status-badge online">● Online</div>
+                    <div style="margin-top: 8px; font-size: 11px; color: #666;">
+                        <div><strong>Model:</strong> ${data.model_loaded ? 'Loaded ✓' : 'Loading...'}</div>
+                        <div><strong>Index:</strong> ${data.index_loaded ? 'Loaded ✓' : 'Loading...'}</div>
+                        <div><strong>NPC:</strong> ${data.active_npc_id || 'base model'}</div>
+                        <div><strong>LoRA:</strong> ${data.active_lora_adapter_path ? 'Selected ✓' : 'none'}</div>
+                    </div>
+                `;
+                
+                document.getElementById('statusCard').innerHTML = statusHtml;
+            } catch (error) {
+                console.error('Server status error:', error);
+                document.getElementById('statusCard').innerHTML = `
+                    <div class="label">Server Status</div>
+                    <div class="status-badge offline">● Offline</div>
+                    <div style="margin-top: 8px; color: #c53030; font-size: 11px;">
+                        <div>Unable to connect</div>
+                        <div style="font-size: 10px; margin-top: 4px;">Retrying...</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function startNewSession() {
+            if (currentSessionId) {
+                await endCurrentSession(false, currentNpc);
+            }
+            currentSessionId = null;
+            try {
+                const response = await fetch(`${API_BASE}/session/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        player_id: currentPlayerId,
+                        npc_id: currentNpc,
+                        player_name: currentPlayerName || null
+                    })
+                });
+                
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Unable to start session');
+                }
+                currentSessionId = data.session_id;
+                localStorage.setItem('game_surf_player_id', currentPlayerId);
+                addSystemMessage(`Started session ${currentSessionId} for ${npcNames[currentNpc]}`);
+                if (data.memory_summary) {
+                    addSystemMessage(`Loaded memory: ${data.memory_summary}`);
+                }
+            } catch (error) {
+                console.error('Error starting session:', error);
+                showError('Unable to start session. Please try again.');
+            }
+        }
+
+        async function endCurrentSession(showMessage = true, npcId = currentNpc) {
+            if (!currentSessionId) return;
+            const endingSessionId = currentSessionId;
+            currentSessionId = null;
+            try {
+                await fetch(`${API_BASE}/session/end`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: endingSessionId,
+                        player_id: currentPlayerId,
+                        npc_id: npcId
+                    })
+                });
+                if (showMessage) addSystemMessage(`Ended session ${endingSessionId}`);
+            } catch (error) {
+                console.warn('Unable to end session:', error);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            if (isLoading) return;
+
+            // Ensure an active session is available before sending chat
+            if (!currentSessionId) {
+                await startNewSession();
+            }
+
+            // Add user message to chat
+            addMessage(message, 'user');
+            input.value = '';
+            input.disabled = true;
+            document.getElementById('sendBtn').disabled = true;
+            isLoading = true;
+
+            // Show loading indicator
+            addMessage('', 'npc-loading');
+
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        player_id: currentPlayerId,
+                        npc_id: currentNpc,
+                        message: message,
+                        session_id: currentSessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Unknown error');
+                }
+
+                const data = await response.json();
+                
+                // Remove loading message
+                const messages = document.querySelectorAll('.message-loading');
+                if (messages.length > 0) {
+                    messages[messages.length - 1].remove();
+                }
+
+                // Add NPC response
+                addMessage(data.npc_response, 'npc');
+
+                clearErrorMessage();
+            } catch (error) {
+                // Remove loading message
+                const messages = document.querySelectorAll('.message-loading');
+                if (messages.length > 0) {
+                    messages[messages.length - 1].remove();
+                }
+
+                showError(`Error: ${error.message}`);
+            } finally {
+                input.disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                isLoading = false;
+                input.focus();
+            }
+        }
+
+        function addMessage(text, type) {
+            const container = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            
+            if (type === 'npc-loading') {
+                messageDiv.className = 'message message-loading';
+                messageDiv.innerHTML = `
+                    <div class="message-content">
+                        <div class="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                messageDiv.className = `message ${type}`;
+                messageDiv.innerHTML = `<div class="message-content">${escapeHtml(text)}</div>`;
+            }
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const container = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message npc';
+            messageDiv.innerHTML = `<div class="message-content" style="background: #e8f4f8; color: #0066cc; font-size: 12px;">${text}</div>`;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showError(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = `<div class="error-message">❌ ${message}</div>`;
+        }
+
+        function clearErrorMessage() {
+            document.getElementById('errorContainer').innerHTML = '';
+        }
+
+        function clearChat() {
+            if (confirm('Clear all messages?')) {
+                document.getElementById('messageContainer').innerHTML = `
+                    <div class="message npc">
+                        <div class="message-content">
+                            👋 Chat cleared. What would you like to know?
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        async function resetRuntimeCache() {
+            if (confirm('Reset runtime chat cache? Supabase memories will be kept.')) {
+                try {
+                    await fetch(`${API_BASE}/reset-memory`, { method: 'POST' });
+                    addSystemMessage('Runtime chat cache reset. Supabase memories kept.');
+                    await startNewSession();
+                } catch (error) {
+                    showError('Failed to reset runtime cache');
+                }
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function handlePlayerNameKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                updatePlayerName();
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', initialize);
+
+        // Refresh server status frequently (every 10 seconds)
+        // This ensures quick detection of server coming online
+        setInterval(checkServerStatus, 10000);
+        
+        // Also force a check when the page regains focus
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                checkServerStatus();
+            }
+        });
+    </script>
+</body>
+</html>

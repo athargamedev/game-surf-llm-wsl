@@ -1,0 +1,12 @@
+{
+  "unity_project_root": "D:\\UnityWorkspaces\\Game_Surf",
+  "llm_workspace_root": "D:\\UnityWorkspaces\\Game_Surf\\Tools\\LLM",
+  "workbench_launcher": "D:\\UnityWorkspaces\\Game_Surf\\Tools\\LLM\\launch_llm_dialogue_workbench.ps1",
+  "workbench_app": "D:\\UnityWorkspaces\\Game_Surf\\Tools\\LLM\\apps\\llm_dialogue_workbench.py",
+  "benchmark_sample": "D:\\UnityWorkspaces\\Game_Surf\\Tools\\LLM\\benchmarks\\unity_mcp_lab_npc_eval_v1.json",
+  "checkpoint_export_script": "D:\\UnityWorkspaces\\Game_Surf\\Tools\\LLM\\scripts\\export_unsloth_checkpoint.py",
+  "training_script": "D:\\UnityWorkspaces\\Game_Surf\\Tools\\LLM\\scripts\\train_unity_dev_llama32_unsloth.py",
+  "current_notebook_export_gguf": "D:\\GithubRepos\\notebooks\\outputs\\unity-llama32-unsloth\\gguf\\unity-llama32-unsloth-q4_k_m.gguf",
+  "current_lmstudio_model": "D:\\llmstudiomodels\\andre\\unity-llama32-unsloth\\unity-llama32-unsloth-q4_k_m.gguf",
+  "llmunity_plugin_root": "D:\\UnityWorkspaces\\Game_Surf\\Assets\\LLMUnity"
+}

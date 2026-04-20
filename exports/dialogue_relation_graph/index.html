@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dialogue Relation Graph</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #0f1220;
+      --panel: rgba(19, 24, 43, 0.92);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text: #eef2ff;
+      --muted: #aab4d6;
+      --player: #7dd3fc;
+      --term: #fda4af;
+      --shared: #f59e0b;
+      --uses: #7c3aed;
+      --node-fill: #1f2742;
+      --canvas: radial-gradient(circle at top, #1b2140 0, #0f1220 58%, #090b13 100%);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { overflow: hidden; }
+
+    .shell {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: var(--canvas);
+    }
+
+    .status {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 14px 18px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-border);
+      backdrop-filter: blur(16px);
+      z-index: 2;
+      flex-wrap: wrap;
+    }
+
+    .status strong {
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    .status span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .status button {
+      margin-left: auto;
+      border: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .status button:hover { background: rgba(255, 255, 255, 0.12); }
+
+    #graph-wrap {
+      position: relative;
+      min-height: 0;
+    }
+
+    #graph {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(12px, 12px);
+      background: rgba(6, 10, 22, 0.94);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 10px 12px;
+      max-width: 320px;
+      font-size: 13px;
+      line-height: 1.4;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+      transition: opacity 120ms ease;
+      z-index: 3;
+    }
+
+    .tooltip .title {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .tooltip .meta {
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="status">
+      <strong>Dialogue Relation Graph</strong>
+      <span class="pill" id="node-count">Loading graph...</span>
+      <span class="pill" id="edge-count"></span>
+      <span class="pill" id="source-state">Source: live API</span>
+      <div class="legend">
+        <span><i class="dot" style="background: var(--player)"></i>Players</span>
+        <span><i class="dot" style="background: var(--term)"></i>Terms</span>
+        <span><i class="dot" style="background: var(--shared)"></i>Shared terms</span>
+      </div>
+      <button id="reload-btn" type="button">Reload</button>
+    </div>
+    <div id="graph-wrap">
+      <svg id="graph" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dialogue relation graph"></svg>
+      <div id="tooltip" class="tooltip"></div>
+    </div>
+  </div>
+
+  <script>
+    const GRAPH_VIEW_URL = '/graph/view';
+    const graphSvg = document.getElementById('graph');
+    const tooltip = document.getElementById('tooltip');
+    const nodeCountEl = document.getElementById('node-count');
+    const edgeCountEl = document.getElementById('edge-count');
+    const sourceStateEl = document.getElementById('source-state');
+    const reloadBtn = document.getElementById('reload-btn');
+    const COLORS = {
+      text: '#eef2ff',
+      muted: '#aab4d6',
+      player: '#7dd3fc',
+      term: '#fda4af',
+      shared: '#f59e0b',
+      uses: '#7c3aed',
+    };
+
+    let currentGraph = null;
+
+    function normalizeNode(node) {
+      return {
+        id: node.node_id || node.id,
+        label: node.label || node.node_id || node.id,
+        type: node.node_type || node.type || 'unknown',
+        description: node.description || '',
+        raw: node,
+      };
+    }
+
+    function normalizeEdge(edge) {
+      return {
+        source: edge.source_node_id || edge.source,
+        target: edge.target_node_id || edge.target,
+        type: edge.edge_type || edge.type || 'related',
+        weight: edge.weight ?? 1,
+        metadata: edge.metadata || {},
+        raw: edge,
+      };
+    }
+
+    function normalizeGraph(raw) {
+      const nodes = (raw.nodes || []).map(normalizeNode).filter(node => node.id);
+      const edges = (raw.edges || []).map(normalizeEdge).filter(edge => edge.source && edge.target);
+      return { nodes, edges, summary: raw.summary || null };
+    }
+
+    async function fetchGraph() {
+      const response = await fetch(GRAPH_VIEW_URL);
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+      const data = await response.json();
+      sourceStateEl.textContent = 'Source: live API';
+      return normalizeGraph(data);
+    }
+
+    async function fetchFallbackGraph() {
+      const response = await fetch('graph.json');
+      if (!response.ok) {
+        throw new Error(`Fallback graph.json returned ${response.status}`);
+      }
+      const data = await response.json();
+      sourceStateEl.textContent = 'Source: local graph.json';
+      return normalizeGraph(data);
+    }
+
+    async function loadGraph() {
+      nodeCountEl.textContent = 'Loading graph...';
+      edgeCountEl.textContent = '';
+      try {
+        currentGraph = await fetchGraph();
+      } catch (primaryError) {
+        try {
+          currentGraph = await fetchFallbackGraph();
+        } catch (fallbackError) {
+          graphSvg.innerHTML = '';
+          nodeCountEl.textContent = 'Nodes: 0';
+          edgeCountEl.textContent = 'Edges: 0';
+          sourceStateEl.textContent = `Error: ${fallbackError.message}`;
+          return;
+        }
+      }
+
+      renderGraph(currentGraph);
+    }
+
+    function layoutNodes(nodes, width, height) {
+      const players = nodes.filter(node => node.type === 'player');
+      const terms = nodes.filter(node => node.type === 'term');
+      const others = nodes.filter(node => node.type !== 'player' && node.type !== 'term');
+      const positions = new Map();
+
+      function stack(items, x, topPad, bottomPad) {
+        const count = items.length || 1;
+        const step = (height - topPad - bottomPad) / Math.max(count, 1);
+        items.forEach((node, index) => {
+          const jitter = (index % 2 === 0 ? -1 : 1) * Math.min(20, 6 + index * 2);
+          positions.set(node.id, {
+            x,
+            y: topPad + step * (index + 0.5) + jitter,
+          });
+        });
+      }
+
+      stack(players, width * 0.22, 90, 90);
+      stack(terms, width * 0.78, 90, 90);
+      stack(others, width * 0.5, 80, 80);
+
+      return positions;
+    }
+
+    function nodeColor(type) {
+      if (type === 'player') return COLORS.player;
+      if (type === 'term') return COLORS.term;
+      return '#cbd5e1';
+    }
+
+    function edgeColor(type) {
+      if (type === 'shared_term') return COLORS.shared;
+      if (type === 'uses') return COLORS.uses;
+      return 'rgba(255,255,255,0.35)';
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    function showTooltip(event, title, meta, body) {
+      tooltip.innerHTML = `
+        <div class="title">${escapeHtml(title)}</div>
+        <div class="meta">${escapeHtml(meta)}</div>
+        <div class="body">${escapeHtml(body)}</div>
+      `;
+      tooltip.style.left = `${event.offsetX}px`;
+      tooltip.style.top = `${event.offsetY}px`;
+      tooltip.style.opacity = '1';
+    }
+
+    function hideTooltip() {
+      tooltip.style.opacity = '0';
+    }
+
+    function renderGraph(graph) {
+      const width = graphSvg.clientWidth || window.innerWidth;
+      const height = graphSvg.clientHeight || window.innerHeight - 72;
+      const positions = layoutNodes(graph.nodes, width, height);
+
+      nodeCountEl.textContent = `Nodes: ${graph.nodes.length}`;
+      edgeCountEl.textContent = `Edges: ${graph.edges.length}`;
+
+      const svgParts = [];
+      svgParts.push(`
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(255,255,255,0.55)"></path>
+          </marker>
+          <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="2" result="blur"></feGaussianBlur>
+            <feMerge>
+              <feMergeNode in="blur"></feMergeNode>
+              <feMergeNode in="SourceGraphic"></feMergeNode>
+            </feMerge>
+          </filter>
+        </defs>
+      `);
+
+      graph.edges.forEach(edge => {
+        const source = positions.get(edge.source);
+        const target = positions.get(edge.target);
+        if (!source || !target) return;
+
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const len = Math.max(Math.hypot(dx, dy), 1);
+        const offset = 32;
+        const x1 = source.x + (dx / len) * offset;
+        const y1 = source.y + (dy / len) * offset;
+        const x2 = target.x - (dx / len) * offset;
+        const y2 = target.y - (dy / len) * offset;
+        const strokeWidth = Math.max(1.25, Math.min(4, Number(edge.weight || 1)));
+
+        svgParts.push(`
+          <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+            stroke="${edgeColor(edge.type)}"
+            stroke-width="${strokeWidth}"
+            opacity="0.82"
+            marker-end="${edge.type === 'uses' ? 'url(#arrow)' : ''}">
+          </line>
+        `);
+      });
+
+      graph.nodes.forEach(node => {
+        const pos = positions.get(node.id);
+        if (!pos) return;
+        const radius = node.type === 'term' ? 26 : 24;
+        const fill = node.type === 'player' ? 'rgba(125, 211, 252, 0.16)' : 'rgba(253, 164, 175, 0.16)';
+        const stroke = nodeColor(node.type);
+        const textAnchor = node.type === 'player' ? 'end' : 'start';
+        const textX = node.type === 'player' ? pos.x - radius - 12 : pos.x + radius + 12;
+        const textY = pos.y + 5;
+        const labelWidth = Math.min(240, Math.max(90, node.label.length * 7.5));
+        const badgeX = node.type === 'player' ? pos.x - labelWidth - 44 : pos.x + 16;
+
+        svgParts.push(`
+          <g class="node" data-id="${escapeHtml(node.id)}" tabindex="0">
+            <circle cx="${pos.x}" cy="${pos.y}" r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="3" filter="url(#glow)"></circle>
+            <circle cx="${pos.x}" cy="${pos.y}" r="${radius - 8}" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.08)" stroke-width="1"></circle>
+            <rect x="${badgeX}" y="${pos.y - 20}" rx="12" ry="12" width="${labelWidth}" height="40"
+                  fill="rgba(6, 10, 22, 0.68)" stroke="rgba(255,255,255,0.08)"></rect>
+            <text x="${textX}" y="${textY}" fill="${COLORS.text}" text-anchor="${textAnchor}" font-size="14" font-weight="700">${escapeHtml(node.label)}</text>
+            ${node.description ? `<text x="${textX}" y="${textY + 16}" fill="${COLORS.muted}" text-anchor="${textAnchor}" font-size="11">${escapeHtml(node.description)}</text>` : ''}
+          </g>
+        `);
+      });
+
+      graphSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      graphSvg.innerHTML = svgParts.join('');
+
+      graph.nodes.forEach(node => {
+        const group = graphSvg.querySelector(`[data-id="${CSS.escape(node.id)}"]`);
+        if (!group) return;
+        group.addEventListener('mouseenter', event => {
+          const degree = graph.edges.filter(edge => edge.source === node.id || edge.target === node.id).length;
+          showTooltip(event, node.label, `${node.type} node • ${degree} edge${degree === 1 ? '' : 's'}`, node.description || 'No description');
+        });
+        group.addEventListener('mousemove', event => {
+          tooltip.style.left = `${event.offsetX}px`;
+          tooltip.style.top = `${event.offsetY}px`;
+        });
+        group.addEventListener('mouseleave', hideTooltip);
+      });
+    }
+
+    reloadBtn.addEventListener('click', loadGraph);
+    window.addEventListener('resize', () => {
+      if (currentGraph) renderGraph(currentGraph);
+    });
+    loadGraph();
+    setInterval(loadGraph, 30000);
+  </script>
+</body>
+</html>

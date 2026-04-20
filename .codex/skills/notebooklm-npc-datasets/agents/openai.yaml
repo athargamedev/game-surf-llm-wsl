@@ -1,0 +1,4 @@
+interface:
+  display_name: "NotebookLM NPC Datasets"
+  short_description: "NotebookLM NPC dataset automation"
+  default_prompt: "Use NotebookLM-direct JSONL batches to build and validate a Game_Surf NPC dataset."

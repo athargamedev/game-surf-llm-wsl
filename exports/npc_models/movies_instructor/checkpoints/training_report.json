@@ -1,0 +1,11 @@
+{
+  "total_steps": 2,
+  "train_losses": [],
+  "eval_losses": [
+    {
+      "step": 2,
+      "eval_loss": 3.5425736904144287
+    }
+  ],
+  "overfitting_detected": false
+}

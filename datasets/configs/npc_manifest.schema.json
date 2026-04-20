@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NPC Model Pipeline Manifest",
+  "description": "Unified configuration for a reproducible fine-tuned NPC model release.",
+  "type": "object",
+  "required": [
+    "npc_key",
+    "base_model",
+    "dataset"
+  ],
+  "properties": {
+    "npc_key": {
+      "type": "string",
+      "description": "The unique identifier of the NPC (must exist in npc_profiles.json)"
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0.0",
+      "description": "Release version of the finetuned model"
+    },
+    "base_model": {
+      "type": "string",
+      "default": "unsloth/Llama-3.2-3B-Instruct",
+      "description": "The HuggingFace or Unsloth base model used for training."
+    },
+    "dataset": {
+      "type": "object",
+      "properties": {
+        "target_generation_count": {
+          "type": "integer",
+          "default": 100
+        },
+        "quality_threshold": {
+          "type": "number",
+          "default": 0.7
+        },
+        "val_split": {
+          "type": "number",
+          "default": 0.1
+        }
+      }
+    },
+    "training": {
+      "type": "object",
+      "properties": {
+        "epochs": {
+          "type": "integer",
+          "default": 3
+        },
+        "learning_rate": {
+          "type": "number",
+          "default": 0.00015
+        },
+        "lora_r": {
+          "type": "integer",
+          "default": 16
+        },
+        "lora_alpha": {
+          "type": "integer",
+          "default": 16
+        },
+        "use_rslora": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "properties": {
+        "save_gguf": {
+          "type": "string",
+          "default": "q4_k_m"
+        },
+        "sync_to_unity": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "description": "Runtime selection data. The WSL test server uses one shared base GGUF and may apply a per-NPC LoRA adapter.",
+      "properties": {
+        "base_model_path": {
+          "type": ["string", "null"],
+          "description": "Shared base GGUF used by the local llama.cpp server."
+        },
+        "lora_adapter_path": {
+          "type": ["string", "null"],
+          "description": "llama.cpp-compatible adapter file selected for this NPC, usually adapter_model.gguf."
+        },
+        "relay_model_path": {
+          "type": ["string", "null"],
+          "description": "Optional dedicated GGUF fallback. Leave null for LoRA-adapter runtime."
+        }
+      }
+    }
+  }
+}
