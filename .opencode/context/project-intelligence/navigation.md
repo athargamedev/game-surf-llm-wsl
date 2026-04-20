@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: high | Version: 1.0 | Updated: 2025-01-12 -->
+<!-- Context: project-intelligence/nav | Priority: critical | Version: 1.1 | Updated: 2026-04-19 -->
 
 # Project Intelligence
 
@@ -18,14 +18,13 @@
 
 ## Quick Routes
 
-| What You Need | File | Description |
-|---------------|------|-------------|
-| Understand the "why" | `business-domain.md` | Problem, users, value proposition |
-| Understand the "how" | `technical-domain.md` | Stack, architecture, integrations |
-| See the connection | `business-tech-bridge.md` | Business → technical mapping |
-| Know the context | `decisions-log.md` | Why decisions were made |
-| Current state | `living-notes.md` | Active issues and open questions |
-| All of the above | Read all files in order | Full project intelligence |
+| File | Description | Priority |
+|------|-------------|----------|
+| `business-domain.md` | Problem, users, value proposition | high |
+| `technical-domain.md` | Stack, architecture, integrations | **critical** |
+| `business-tech-bridge.md` | Business → technical mapping | high |
+| `decisions-log.md` | Why decisions were made | medium |
+| `living-notes.md` | Active issues and open questions | medium |
 
 ## Usage
 

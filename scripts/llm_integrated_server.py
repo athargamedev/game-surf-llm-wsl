@@ -21,6 +21,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.llama_cpp import LlamaCPP
 from llama_index.core.memory import ChatMemoryBuffer
 from supabase import Client, create_client
+from scripts.supabase_client import SupabaseClient, get_client as get_supabase
 
 app = FastAPI(title="Game_Surf NPC Dialogue Integrated Server")
 
@@ -78,6 +79,7 @@ GRAPH_REFRESH_INTERVAL_SECONDS = int(os.environ.get("GRAPH_REFRESH_INTERVAL_SECO
 MEMORY_SLOT = "[MEMORY_CONTEXT: {player_memory_summary}]"
 
 supabase_client: Client | None = None
+supabase_wrapper: SupabaseClient | None = None
 chat_engines: dict[str, object] = {}
 # active_sessions: maps (player_id, npc_id) -> session_id
 active_sessions: dict[str, str] = {}
@@ -422,7 +424,22 @@ def build_system_prompt(npc_id: str) -> str:
     return system_prompt
 
 
-def load_player_context(player_id: str, npc_id: str) -> str:
+def extract_keywords(text: str) -> set[str]:
+    if not text:
+        return set()
+    words = text.lower().split()
+    return {w.strip(".,!?;:()[]{}") for w in words if len(w) > 3}
+
+
+def score_memory_relevance(memory_text: str, current_message: str) -> float:
+    memory_kw = extract_keywords(memory_text)
+    current_kw = extract_keywords(current_message)
+    if not current_kw:
+        return 0.0
+    return len(memory_kw & current_kw) / len(current_kw)
+
+
+def load_player_context(player_id: str, npc_id: str, current_message: str = "") -> str:
     profile_lines: list[str] = []
     memory_lines: list[str] = []
     term_lines: list[str] = []
@@ -446,12 +463,21 @@ def load_player_context(player_id: str, npc_id: str) -> str:
         print(f"Player profile retrieval skipped: {exc}")
 
     try:
+        session_count_resp = (
+            supabase_client.table("dialogue_sessions")
+            .select("session_id", count="exact")
+            .match({"player_id": player_id, "npc_id": npc_id})
+            .execute()
+        )
+        session_count = session_count_resp.count or 0
+        
+        mem_limit = min(5, max(2, session_count)) if session_count > 10 else 5
         mem_response = (
             supabase_client.table("npc_memories")
-            .select("summary, created_at")
+            .select("summary, created_at, raw_json")
             .match({"player_id": player_id, "npc_id": npc_id})
             .order("created_at", desc=True)
-            .limit(3)
+            .limit(mem_limit)
             .execute()
         )
         if mem_response.data:
@@ -459,8 +485,12 @@ def load_player_context(player_id: str, npc_id: str) -> str:
             for row in mem_response.data:
                 summary = (row.get("summary") or "").strip()
                 if summary:
-                    summaries.append(summary[:320].replace("\n", " "))
+                    raw = row.get("raw_json") or {}
+                    turn_count = raw.get("session_turn_count", "?")
+                    summaries.append(f"[{turn_count}t] {summary[:250].replace(chr(10), ' ')}")
             if summaries:
+                if session_count > 0:
+                    memory_lines.append(f"Total conversations: {session_count}")
                 for idx, summary in enumerate(summaries, start=1):
                     memory_lines.append(f"{idx}. {summary}")
     except Exception as exc:
@@ -714,6 +744,8 @@ def get_chat_engine(player_id: str, npc_id: str):
 @app.on_event("startup")
 def on_startup() -> None:
     create_supabase_client()
+    global supabase_wrapper
+    supabase_wrapper = get_supabase()
     load_npc_model_registry()
     try:
         init_embedding_and_llm()

@@ -495,8 +495,11 @@
     <script>
         const API_BASE = 'http://127.0.0.1:8000';
         let currentNpc = 'maestro_jazz_instructor';
-        let currentPlayerId = localStorage.getItem('game_surf_player_id') || 'web_player_' + Math.random().toString(36).substr(2, 9);
-        let currentPlayerName = localStorage.getItem('game_surf_player_name') || '';
+        // Stable player ID: use saved or derive from saved name (no random)
+        let savedName = localStorage.getItem('game_surf_player_name');
+        let currentPlayerId = localStorage.getItem('game_surf_player_id') || 
+            (savedName ? 'player_' + savedName.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'anonymous_player');
+        let currentPlayerName = savedName || '';
         let currentSessionId = null;
         let isLoading = false;
         let serverModels = {};
@@ -565,11 +568,17 @@
                 return;
             }
 
-            // Generate new player ID if name changed
+            // Generate consistent player ID from name only (deterministic)
             const oldName = currentPlayerName;
             if (newName !== oldName) {
                 currentPlayerName = newName;
-                currentPlayerId = 'player_' + newName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).substr(2, 4);
+                // Use name-based ID without random suffix for stable identity
+                const stableId = 'player_' + newName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                // Only create new ID if this is a brand new name (no existing stable ID)
+                if (!localStorage.getItem('game_surf_player_id') || !localStorage.getItem('game_surf_player_id')?.startsWith(stableId)) {
+                    currentPlayerId = stableId;
+                }
+                // Else keep existing player_id for consistent memory
                 
                 // Save to localStorage
                 localStorage.setItem('game_surf_player_name', currentPlayerName);

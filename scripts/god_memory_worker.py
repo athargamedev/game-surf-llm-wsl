@@ -14,6 +14,7 @@ from typing import Any, Optional
 import requests
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from supabase import Client, create_client
+from scripts.supabase_client import SupabaseClient, get_client as get_supabase
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -342,6 +343,7 @@ def main() -> None:
     
     embedding_model = init_embedding_model(embedding_model_name)
     supabase = create_supabase_client(supabase_url, supabase_key)
+    supabase_wrapper = get_supabase()
     
     poll_queues(supabase, embedding_model)
 

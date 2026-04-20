@@ -51,9 +51,9 @@
   },
   "model": "opencode/big-pickle",
   "plugin": [
-    "oh-my-openagent",
     "opencode-antigravity-auth@1.6.0",
-    "opencode-openai-codex-auth"
+    "opencode-openai-codex-auth",
+    "@plannotator/opencode@latest"
   ],
   "provider": {
     "google": {
