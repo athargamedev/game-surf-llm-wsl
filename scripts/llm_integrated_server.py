@@ -161,7 +161,6 @@ class SessionHistoryResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-    status: str
 
 
 class StatusResponse(BaseModel):
@@ -177,6 +176,7 @@ class StatusResponse(BaseModel):
     supabase_connected: bool
     llm_error: str | None = None
     index_error: str | None = None
+    gpu_acceleration: dict | None = None
 
 
 class GodMemoryRequest(BaseModel):
@@ -309,6 +309,21 @@ def resolve_lora_adapter_path_for_npc(npc_id: str) -> str | None:
         return runtime_lora
 
     return None
+
+
+def _log_lora_resolution_status(npc_id: str, adapter_path: str | None, model_path: str) -> None:
+    """Log clear diagnostic info about LoRA resolution."""
+    if adapter_path:
+        size_mb = round(Path(adapter_path).stat().st_size / 1024 / 1024, 2) if Path(adapter_path).exists() else 0
+        print(f"[LoRA] {npc_id}: adapter loaded ({size_mb} MB), model={model_path}")
+    else:
+        print(f"[LoRA] {npc_id}: NO LoRA adapter found — using base model ({model_path})")
+        manifest = npc_model_registry.get(npc_id)
+        if manifest:
+            manifest_adapter_dir = manifest.get("artifacts", {}).get("adapter_dir")
+            manifest_runtime_lora = manifest.get("runtime", {}).get("lora_adapter_path")
+            print(f"[LoRA]   manifest adapter_dir: {manifest_adapter_dir}")
+            print(f"[LoRA]   manifest runtime.lora_adapter_path: {manifest_runtime_lora}")
 
 
 def resolve_gguf_model_path_for_npc(npc_id: str) -> str | None:
@@ -839,6 +854,7 @@ def status() -> StatusResponse:
         supabase_connected=supabase_client is not None,
         llm_error=llm_load_error,
         index_error=index_load_error,
+        gpu_acceleration=get_gpu_acceleration_status(),
     )
 
 
@@ -1340,6 +1356,8 @@ def select_npc_runtime(npc_id: str | None = None, model_path: str | None = None)
             selected_model_path = dedicated_gguf
         elif selected_npc not in npc_model_registry:
             print(f"No trained adapter manifest found for NPC '{selected_npc}'. Using base model.")
+        
+        _log_lora_resolution_status(selected_npc, selected_lora_path, selected_model_path)
 
     if not selected_model_path:
         selected_model_path = BASE_MODEL_PATH
@@ -1416,10 +1434,45 @@ def get_gpu_memory_mb() -> dict | None:
                 "allocated_mb": torch.cuda.memory_allocated() / 1024 / 1024,
                 "reserved_mb": torch.cuda.memory_reserved() / 1024 / 1024,
                 "max_allocated_mb": torch.cuda.max_memory_allocated() / 1024 / 1024,
+                "utilization_pct": _get_gpu_utilization(),
             }
     except Exception:
         pass
     return None
+
+
+def _get_gpu_utilization() -> float:
+    """Query current GPU utilization percentage via nvidia-smi."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            return float(result.stdout.strip())
+    except Exception:
+        pass
+    return 0.0
+
+
+def get_gpu_acceleration_status() -> dict:
+    """Check if llama.cpp is actually using GPU acceleration."""
+    status = {
+        "torch_cuda_available": False,
+        "gpu_memory_mb": 0.0,
+        "llm_n_gpu_layers": LLAMA_N_GPU_LAYERS,
+        "gpu_utilization_pct": 0.0,
+    }
+    try:
+        import torch
+        status["torch_cuda_available"] = torch.cuda.is_available()
+        if torch.cuda.is_available():
+            status["gpu_memory_mb"] = torch.cuda.memory_allocated() / 1024 / 1024
+            status["gpu_utilization_pct"] = _get_gpu_utilization()
+    except Exception:
+        pass
+    return status
 
 
 @app.get("/metrics")
@@ -1464,6 +1517,104 @@ def debug_npc_state() -> dict:
         "llm_loaded": llm_loaded,
         "llm_error": llm_load_error,
         "gpu_memory": get_gpu_memory_mb(),
+        "gpu_acceleration": get_gpu_acceleration_status(),
+    }
+
+
+@app.get("/debug/lora-status/{npc_id}")
+def debug_lora_status(npc_id: str) -> dict:
+    """Check LoRA adapter status for a specific NPC."""
+    load_npc_model_registry()
+    manifest = npc_model_registry.get(npc_id)
+    
+    if not manifest:
+        # Try fuzzy match
+        for key, m in npc_model_registry.items():
+            if npc_id in key or key in npc_id:
+                manifest = m
+                break
+    
+    if not manifest:
+        return {
+            "npc_id": npc_id,
+            "found": False,
+            "error": f"NPC '{npc_id}' not found in registry. Available: {list(npc_model_registry.keys())}",
+        }
+    
+    adapter_path = resolve_lora_adapter_path_for_npc(npc_id)
+    gguf_path = resolve_gguf_model_path_for_npc(npc_id)
+    adapter_active = npc_adapter_is_active(npc_id)
+    
+    return {
+        "npc_id": npc_id,
+        "found": True,
+        "npc_key": manifest.get("npc_key"),
+        "artifact_key": manifest.get("artifact_key"),
+        "supabase_npc_id": manifest.get("supabase_npc_id"),
+        "adapter_path": adapter_path,
+        "adapter_exists": Path(adapter_path).exists() if adapter_path else False,
+        "adapter_size_mb": round(Path(adapter_path).stat().st_size / 1024 / 1024, 2) if adapter_path and Path(adapter_path).exists() else None,
+        "gguf_path": gguf_path,
+        "gguf_exists": Path(gguf_path).is_file() if gguf_path else False,
+        "adapter_currently_active": adapter_active,
+        "runtime_mode": "lora_adapter" if adapter_path else ("dedicated_gguf" if gguf_path else "base_model"),
+        "profile": manifest.get("profile", {}),
+    }
+
+
+@app.get("/debug/system-prompt/{npc_id}")
+def debug_system_prompt(npc_id: str) -> dict:
+    """Get the constructed system prompt for a specific NPC (without memory slot)."""
+    system_prompt = build_system_prompt(npc_id)
+    return {
+        "npc_id": npc_id,
+        "system_prompt": system_prompt,
+        "system_prompt_length": len(system_prompt),
+    }
+
+
+@app.get("/debug/all-npc-state")
+def debug_all_npc_state() -> dict:
+    """Get state of all NPC LoRA adapters."""
+    load_npc_model_registry()
+    states = {}
+    for npc_id in sorted(npc_model_registry.keys()):
+        manifest = npc_model_registry[npc_id]
+        adapter_path = resolve_lora_adapter_path_for_npc(npc_id)
+        gguf_path = resolve_gguf_model_path_for_npc(npc_id)
+        
+        # Check profile match
+        profiles_path = TOOLS_LLM_ROOT / "datasets" / "configs" / "npc_profiles.json"
+        profile_match = None
+        if profiles_path.exists():
+            try:
+                profiles_data = json.loads(profiles_path.read_text())
+                profiles = profiles_data.get("profiles", {})
+                prof = profiles.get(npc_id)
+                if not prof:
+                    for key, value in profiles.items():
+                        if npc_id in key or key in npc_id:
+                            prof = value
+                            break
+                profile_match = prof.get("display_name") if prof else None
+            except Exception:
+                pass
+        
+        states[npc_id] = {
+            "npc_key": manifest.get("npc_key"),
+            "artifact_key": manifest.get("artifact_key"),
+            "adapter_path": adapter_path,
+            "adapter_exists": bool(adapter_path and Path(adapter_path).exists()),
+            "adapter_size_mb": round(Path(adapter_path).stat().st_size / 1024 / 1024, 2) if adapter_path and Path(adapter_path).exists() else None,
+            "gguf_path": gguf_path,
+            "runtime_mode": "lora_adapter" if adapter_path else ("dedicated_gguf" if gguf_path else "base_model"),
+            "profile_display_name": profile_match,
+        }
+    return {
+        "active_npc_id": active_npc_id,
+        "active_lora_adapter_path": active_lora_adapter_path,
+        "gpu_acceleration": get_gpu_acceleration_status(),
+        "npcs": states,
     }
 
 
@@ -2086,6 +2237,114 @@ def get_session_history_sync(player_id: str, npc_id: str) -> Optional[dict]:
         return None
 
 
+# Character-specific probe messages for identity verification
+_NPC_PROBE_MESSAGES: dict[str, str] = {
+    "ai_news_instructor": "What is your name and what do you teach?",
+    "maestro_jazz_instructor": "What is your name and what genre do you specialize in?",
+    "llm_instructor": "What is your name and what topic do you teach?",
+    "marvel_comics_instructor": "What is your name and what universe do you know best?",
+    "supabase_instructor": "What is your name and what database tool do you teach?",
+    "kosmos_instructor": "What is your name and what mythology do you teach?",
+}
+
+# Expected name fragments for identity verification
+_NPC_NAME_PATTERNS: dict[str, list[str]] = {
+    "ai_news_instructor": ["ai news", "analyst", "ai"],
+    "maestro_jazz_instructor": ["maestro", "jazz"],
+    "llm_instructor": ["lora", "professor", "llm"],
+    "marvel_comics_instructor": ["marvel", "oracle", "marveloracle"],
+    "supabase_instructor": ["supabase", "professor"],
+    "kosmos_instructor": ["kosmos", "greek", "mythology"],
+}
+
+
+def verify_npc_identity(npc_id: str, response: str) -> dict:
+    """Verify that the NPC response matches the expected identity."""
+    if not response:
+        return {"verified": False, "reason": "empty response"}
+    
+    response_lower = response.lower()
+    patterns = _NPC_NAME_PATTERNS.get(npc_id, [npc_id.replace("_", " ")])
+    
+    matched = [p for p in patterns if p in response_lower]
+    partial = [p for p in patterns if any(word in response_lower for word in p.split())]
+    
+    # Check for wrong identity
+    wrong_patterns = [
+        "ai news analyst", "analyst", "tech journalist",
+        "helpful npc", "helpful ai", "helpful assistant",
+    ]
+    is_wrong = any(p in response_lower for p in wrong_patterns)
+    
+    return {
+        "verified": len(matched) > 0 and not is_wrong,
+        "matched_patterns": matched,
+        "partial_matches": partial,
+        "is_wrong_identity": is_wrong,
+        "response_preview": response[:200],
+    }
+
+
+def probe_npc_identity_sync(npc_id: str) -> Optional[dict]:
+    """Quickly probe an NPC's identity with a character-specific question."""
+    probe_msg = _NPC_PROBE_MESSAGES.get(npc_id)
+    if not probe_msg:
+        return None
+    
+    probe_player = f"__probe_{npc_id}__"
+    try:
+        # Start session
+        sess_resp = requests.post(
+            f"{BASE_URL}/session/start",
+            json={"player_id": probe_player, "player_name": "ProbeBot", "npc_id": npc_id},
+            timeout=10,
+        )
+        if sess_resp.status_code != 200:
+            return None
+        session_id = sess_resp.json().get("session_id")
+        if not session_id:
+            return None
+        
+        # Send probe
+        chat_resp = requests.post(
+            f"{BASE_URL}/chat",
+            json={"player_id": probe_player, "npc_id": npc_id, "message": probe_msg, "session_id": session_id},
+            timeout=30,
+        )
+        npc_response = chat_resp.json().get("npc_response", "") if chat_resp.status_code == 200 else ""
+        
+        # End session immediately
+        requests.post(
+            f"{BASE_URL}/session/end",
+            json={"session_id": session_id, "player_id": probe_player, "npc_id": npc_id},
+            timeout=5,
+        )
+        
+        identity_check = verify_npc_identity(npc_id, npc_response)
+        return {
+            "npc_id": npc_id,
+            "probe_message": probe_msg,
+            "npc_response": npc_response[:300],
+            "identity_check": identity_check,
+        }
+    except Exception as e:
+        return {"npc_id": npc_id, "error": str(e)}
+
+
+def get_all_npc_lora_status_sync() -> dict:
+    """Get LoRA status for all NPCs at once."""
+    results = {}
+    for npc_id in ["ai_news_instructor", "maestro_jazz_instructor", "llm_instructor", 
+                   "marvel_comics_instructor", "supabase_instructor", "kosmos_instructor"]:
+        try:
+            resp = requests.get(f"{BASE_URL}/debug/lora-status/{npc_id}", timeout=5)
+            if resp.status_code == 200:
+                results[npc_id] = resp.json()
+        except Exception:
+            results[npc_id] = {"error": "failed to fetch"}
+    return results
+
+
 def get_player_memories_sync(player_id: str) -> Optional[dict]:
     try:
         resp = requests.get(f"{BASE_URL}/players/{player_id}/memories", timeout=10)
@@ -2144,6 +2403,7 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         "history_verified": False,
         "player_memories_verified": False,
         "god_memory_verified": False,
+        "identity_verified": None,
         "turn_count": 0,
         "duration_seconds": 0,
         "error": None,
@@ -2172,6 +2432,7 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         
         time.sleep(0.5)
         
+        # First: send actual messages
         for i, msg in enumerate(messages):
             if msg and msg.strip():
                 set_test_update(
@@ -2192,7 +2453,22 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                 result["turn_count"] += 1
                 set_test_update(last_response=npc_response)
 
-                time.sleep(5)
+                time.sleep(3)
+        
+        # Identity probe: verify the NPC has the right persona
+        if not result["error"] and npc_id in _NPC_PROBE_MESSAGES:
+            set_test_update(session_status="probing identity", last_message="[identity probe]")
+            probe_resp = send_chat_sync(player_id, npc_id, _NPC_PROBE_MESSAGES[npc_id], session_id)
+            if probe_resp:
+                probe_response = probe_resp.get("npc_response", "")
+                identity_check = verify_npc_identity(npc_id, probe_response)
+                result["identity_verified"] = identity_check
+                set_test_update(
+                    session_status="identity check done",
+                    identity_verified=identity_check.get("verified"),
+                    last_response=f"ID:{identity_check.get('verified')} {probe_response[:80]}"
+                )
+            time.sleep(2)
         
         if not result["error"]:
             history = get_session_history_sync(player_id, npc_id)
@@ -2438,6 +2714,7 @@ async def api_test_status():
                 "history_verified": r.get("history_verified", False),
                 "player_memories_verified": r.get("player_memories_verified", False),
                 "god_memory_verified": r.get("god_memory_verified", False),
+                "identity_verified": r.get("identity_verified"),
                 "error": r.get("error"),
                 "duration_seconds": round(r["duration_seconds"], 1),
             }
@@ -2456,6 +2733,37 @@ async def api_test_status():
         "start_time": test_state.get("start_time"),
         "last_update": last_update,
     }
+
+
+@app.get("/api/npc-identity-probe/{npc_id}")
+async def api_npc_identity_probe(npc_id: str) -> dict:
+    """Probe an NPC's identity with a character-specific question."""
+    result = probe_npc_identity_sync(npc_id)
+    if result is None:
+        raise HTTPException(404, f"No probe configured for NPC '{npc_id}'")
+    return result
+
+
+@app.get("/api/all-npc-identity")
+async def api_all_npc_identity() -> dict:
+    """Probe all NPCs' identities at once."""
+    results = {}
+    for npc_id in ["ai_news_instructor", "maestro_jazz_instructor", "llm_instructor",
+                   "marvel_comics_instructor", "supabase_instructor", "kosmos_instructor"]:
+        results[npc_id] = probe_npc_identity_sync(npc_id) or {"npc_id": npc_id, "error": "probe failed"}
+    return {"probes": results}
+
+
+@app.get("/api/all-npc-lora")
+async def api_all_npc_lora() -> dict:
+    """Get LoRA status for all NPCs."""
+    return get_all_npc_lora_status_sync()
+
+
+@app.get("/api/gpu-status")
+async def api_gpu_status() -> dict:
+    """Get GPU acceleration status."""
+    return get_gpu_acceleration_status()
 
 
 if __name__ == "__main__":

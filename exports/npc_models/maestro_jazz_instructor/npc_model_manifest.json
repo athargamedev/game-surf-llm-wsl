@@ -1,6 +1,6 @@
 {
   "npc_key": "maestro_jazz_instructor",
-  "artifact_key": "jazz_history_instructor",
+  "artifact_key": "maestro_jazz_instructor",
   "dataset_name": "jazz_history_dataset",
   "supabase_npc_id": "maestro_jazz_instructor",
   "version": "1.0.0",
@@ -26,16 +26,16 @@
     "sync_to_unity": true
   },
   "artifacts": {
-    "output_dir": "exports/npc_models/jazz_history_instructor",
-    "adapter_dir": "exports/npc_models/jazz_history_instructor/lora_adapter",
-    "gguf_path": "exports/npc_models/jazz_history_instructor/gguf"
+    "output_dir": "exports/npc_models/maestro_jazz_instructor",
+    "adapter_dir": "exports/npc_models/maestro_jazz_instructor/lora_adapter",
+    "gguf_path": "exports/npc_models/maestro_jazz_instructor/gguf"
   },
   "runtime": {
     "base_model_path": "exports/training_test_export/gguf_gguf/llama-3.2-3b-instruct.Q4_K_M.gguf",
-    "lora_adapter_path": "exports/npc_models/jazz_history_instructor/lora_adapter/adapter_model.gguf",
-    "relay_model_path": "exports/npc_models/jazz_history_instructor/gguf",
+    "lora_adapter_path": "exports/npc_models/maestro_jazz_instructor/lora_adapter/adapter_model.gguf",
+    "relay_model_path": "exports/npc_models/maestro_jazz_instructor/gguf",
     "unity_model_name": null,
-    "unity_lora_name": "LLM/loras/jazz_history_instructor/adapter_model.safetensors"
+    "unity_lora_name": "LLM/loras/maestro_jazz_instructor/adapter_model.gguf"
   },
   "profile": {
     "display_name": "The Maestro",

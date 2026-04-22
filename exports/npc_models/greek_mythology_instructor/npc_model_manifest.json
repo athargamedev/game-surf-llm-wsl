@@ -1,5 +1,5 @@
 {
-  "npc_key": "kosmos_instructor",
+  "npc_key": "greek_mythology_instructor",
   "artifact_key": "greek_mythology_instructor",
   "dataset_name": "greek_mythology_dataset",
   "supabase_npc_id": "kosmos_instructor",
@@ -35,7 +35,7 @@
     "lora_adapter_path": "exports/npc_models/greek_mythology_instructor/lora_adapter/adapter_model.gguf",
     "relay_model_path": "exports/npc_models/greek_mythology_instructor/gguf",
     "unity_model_name": null,
-    "unity_lora_name": "LLM/loras/greek_mythology_instructor/adapter_model.safetensors"
+    "unity_lora_name": "LLM/loras/greek_mythology_instructor/adapter_model.gguf"
   },
   "profile": {
     "display_name": "Professor Kosmos",

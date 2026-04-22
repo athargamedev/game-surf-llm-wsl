@@ -35,7 +35,7 @@
     "lora_adapter_path": "exports/npc_models/llm_instructor/lora_adapter/adapter_model.gguf",
     "relay_model_path": "exports/npc_models/llm_instructor/gguf",
     "unity_model_name": null,
-    "unity_lora_name": "LLM/loras/llm_instructor/adapter_model.safetensors"
+    "unity_lora_name": "LLM/loras/llm_instructor/adapter_model.gguf"
   },
   "profile": {
     "display_name": "Professor LoRA",

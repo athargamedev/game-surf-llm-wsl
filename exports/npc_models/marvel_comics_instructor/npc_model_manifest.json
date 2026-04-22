@@ -26,16 +26,16 @@
     "sync_to_unity": false
   },
   "artifacts": {
-    "output_dir": "exports/surf_llama3b",
-    "adapter_dir": "exports/surf_llama3b/lora_adapter",
-    "gguf_path": "exports/surf_llama3b/gguf"
+    "output_dir": "exports/npc_models/marvel_comics_instructor",
+    "adapter_dir": "exports/npc_models/marvel_comics_instructor",
+    "gguf_path": "exports/npc_models/marvel_comics_instructor/gguf"
   },
   "runtime": {
     "base_model_path": "exports/training_test_export/gguf_gguf/llama-3.2-3b-instruct.Q4_K_M.gguf",
-    "lora_adapter_path": "exports/surf_llama3b/lora_adapter/adapter_model.gguf",
-    "relay_model_path": "exports/surf_llama3b/gguf",
+    "lora_adapter_path": "exports/npc_models/marvel_comics_instructor/adapter_model.gguf",
+    "relay_model_path": "exports/npc_models/marvel_comics_instructor/gguf",
     "unity_model_name": null,
-    "unity_lora_name": "LLM/loras/marvel_comics_instructor/adapter_model.safetensors"
+    "unity_lora_name": "LLM/loras/marvel_comics_instructor/adapter_model.gguf"
   },
   "profile": {
     "display_name": "MarvelOracle",
