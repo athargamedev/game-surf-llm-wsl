@@ -606,18 +606,37 @@ def apply_memory_slot(system_prompt: str, player_id: str, npc_id: str) -> str:
     return f"{system_prompt}\n[MEMORY_CONTEXT]\n{player_memory_summary}"
 
 
-def enqueue_memory_embedding_job(player_id: str, npc_id: str, session_id: str) -> None:
+def enqueue_memory_embedding_job(player_id: str, npc_id: str, session_id: str) -> dict:
+    """Enqueue memory embedding job and return status details."""
     if supabase_client is None:
-        raise RuntimeError("Supabase not connected")
-
-    supabase_client.rpc(
-        "enqueue_memory_embedding",
-        {
-            "player_id_param": player_id,
-            "npc_id_param": npc_id,
-            "session_id_param": session_id,
-        },
-    ).execute()
+        error_msg = "Supabase client not connected"
+        print(f"[ERROR] {error_msg}")
+        return {"status": "error", "reason": "client_not_connected"}
+    
+    try:
+        print(f"[Memory] Enqueuing memory embedding for {player_id}/{npc_id}/{session_id[:8]}")
+        resp = supabase_client.rpc(
+            "enqueue_memory_embedding",
+            {
+                "player_id_param": player_id,
+                "npc_id_param": npc_id,
+                "session_id_param": session_id,
+            },
+        ).execute()
+        
+        # Check for RPC errors
+        if hasattr(resp, 'error') and resp.error:
+            error_msg = str(resp.error)
+            print(f"[ERROR] RPC error: {error_msg}")
+            return {"status": "error", "reason": "rpc_error", "detail": error_msg}
+        
+        print(f"[Memory] Successfully enqueued")
+        return {"status": "enqueued"}
+    
+    except Exception as exc:
+        error_msg = str(exc)
+        print(f"[ERROR] Exception enqueuing memory: {error_msg}")
+        return {"status": "error", "reason": "exception", "detail": error_msg}
 
 
 def enqueue_graph_rebuild_job(
@@ -1143,8 +1162,11 @@ def end_session(request: EndSessionRequest) -> dict:
 
             # Enqueue async jobs for GOD memory and graph rebuild
             try:
-                enqueue_memory_embedding_job(request.player_id, request.npc_id, request.session_id)
-                print(f"Enqueued memory embedding for {request.player_id}/{request.npc_id}")
+                enqueue_result = enqueue_memory_embedding_job(request.player_id, request.npc_id, request.session_id)
+                if enqueue_result["status"] != "enqueued":
+                    print(f"[WARN] Memory embedding enqueue failed: {enqueue_result}")
+                else:
+                    print(f"Enqueued memory embedding for {request.player_id}/{request.npc_id}")
             except Exception as exc:
                 print(f"Failed to enqueue memory embedding: {exc}")
 
@@ -1761,6 +1783,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
         .player-status { color: #888; }
         .player-status.done { color: #4ade80; }
         .player-status.error { color: #e94560; }
+        .player-status.partial { color: #fbbf24; }
         .summary { background: #0f3460; padding: 16px; border-radius: 8px; margin-top: 16px; }
         .summary h3 { color: #00d4ff; margin-bottom: 12px; }
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -2152,13 +2175,36 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
             document.getElementById('memoriesCreated').textContent = memories;
             
             const details = document.getElementById('playerDetails');
-            details.innerHTML = results.map(r => 
-                '<div class="player-row ' + (r.error ? 'error' : '') + '">' +
-                    '<span class="player-num">' + r.player_id.replace('player_', '') + '</span>' +
+            details.innerHTML = results.map(r => {
+                let statusText = '';
+                let statusClass = 'done';
+                
+                if (r.error) {
+                    statusText = r.error;
+                    statusClass = 'error';
+                } else if (r.memory_created) {
+                    const reason = r.memory_retry_reason || 'ok';
+                    const attempts = r.memory_retry_attempts > 1 ? ` (${r.memory_retry_attempts} retries)` : '';
+                    statusText = '✓ Memory (' + reason + attempts + ')';
+                } else {
+                    const reason = r.memory_retry_reason || 'unknown';
+                    statusText = '✗ No memory (' + reason + ')';
+                    statusClass = 'partial';
+                }
+                
+                let extraInfo = '';
+                if (r.memory_persistence_verified !== undefined) {
+                    extraInfo = '<span style="margin-left: 10px; font-size: 11px; color: #888;">[Phase2: ' + 
+                        (r.memory_persistence_verified ? '✓ persist' : '✗ no persist') + ']</span>';
+                }
+                
+                return '<div class="player-row ' + (r.error ? 'error' : '') + '">' +
+                    '<span class="player-num">' + r.player_id.substr(-3) + '</span>' +
                     '<span class="player-name">' + r.player_name + '</span>' +
-                    '<span class="player-status ' + (r.error ? 'error' : 'done') + '">' + (r.error || (r.memory_created ? '✓ Memory' : 'Session done')) + '</span>' +
-                '</div>'
-            ).join('');
+                    '<span class="player-status ' + statusClass + '">' + statusText + '</span>' +
+                    extraInfo +
+                '</div>';
+            }).join('');
         }
     </script>
 </body>
@@ -2433,6 +2479,59 @@ def get_god_memory_sync(player_id: str, npc_id: str) -> Optional[dict]:
         return None
 
 
+def validate_memory_quality(memory_response: Optional[dict], 
+                            expected_min_length: int = 30) -> tuple[bool, str]:
+    """Validate that memory is real and complete.
+    
+    Returns (is_valid, reason_if_invalid)
+    """
+    if not memory_response:
+        return False, "response_is_none"
+    
+    memory_context = memory_response.get("memory_context", "")
+    
+    # Check for default "no memory" response
+    if not memory_context or memory_context.strip() == "No saved player memory.":
+        return False, "empty_or_default"
+    
+    # Check length is reasonable
+    context_len = len(memory_context.strip())
+    if context_len < expected_min_length:
+        return False, f"too_short ({context_len}<{expected_min_length})"
+    
+    # Check structure (should have some sections)
+    if "\n\n" not in memory_context:
+        return False, "lacks_expected_structure"
+    
+    return True, "valid"
+
+
+def wait_for_memory_with_retry(player_id: str, npc_id: str, 
+                               max_retries: int = 10, 
+                               initial_backoff: float = 2.0) -> tuple[bool, int, str]:
+    """Poll for memory with exponential backoff.
+    
+    Returns (memory_exists, attempt_number, reason)
+    """
+    for attempt in range(max_retries):
+        try:
+            memory = get_memory_sync(player_id, npc_id)
+            is_valid, reason = validate_memory_quality(memory)
+            if is_valid:
+                print(f"[Memory] Found on attempt {attempt + 1}/{max_retries}")
+                return True, attempt + 1, "found"
+        except Exception as e:
+            print(f"[Memory] Error checking memory (attempt {attempt + 1}): {e}")
+        
+        if attempt < max_retries - 1:
+            wait_time = initial_backoff * (1.5 ** attempt)
+            print(f"[Memory] Not ready yet, retry in {wait_time:.1f}s")
+            time.sleep(wait_time)
+    
+    print(f"[Memory] Timeout after {max_retries} attempts")
+    return False, max_retries, "timeout"
+
+
 def trigger_graph_rebuild_sync() -> bool:
     try:
         resp = requests.post(
@@ -2457,6 +2556,11 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         "responses_received": [],
         "memory_created": False,
         "memory_loaded_on_start": False,
+        "memory_loaded_on_start_phase2": None,
+        "memory_persistence_verified": None,
+        "memory_retry_attempts": 0,
+        "memory_retry_reason": None,
+        "memory_quality_reason": None,
         "history_verified": False,
         "player_memories_verified": False,
         "god_memory_verified": False,
@@ -2478,7 +2582,17 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         
         session_id = session_resp.get("session_id")
         result["session_id"] = session_id
-        result["memory_loaded_on_start"] = bool(session_resp.get("memory_summary"))
+        
+        # IMPORTANT: Track memory at session start
+        memory_summary_at_start = session_resp.get("memory_summary")
+        result["memory_loaded_on_start"] = bool(memory_summary_at_start)
+        
+        # Log what we got
+        if memory_summary_at_start:
+            print(f"[{player_id}] Memory loaded on session start: {memory_summary_at_start[:100]}...")
+        else:
+            print(f"[{player_id}] No memory loaded on session start")
+        
         set_test_update(
             player_id=player_id,
             npc_id=npc_id,
@@ -2513,18 +2627,24 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                 time.sleep(TEST_MESSAGE_DELAY_SECONDS)
         
         # Identity probe: verify the NPC has the right persona
+        # NOTE: Probe uses a separate player_id ("__probe__") to avoid polluting session data
         if not result["error"] and npc_id in _NPC_PROBE_MESSAGES:
-            set_test_update(session_status="probing identity", last_message="[identity probe]")
-            probe_resp = send_chat_sync(player_id, npc_id, _NPC_PROBE_MESSAGES[npc_id], session_id)
+            set_test_update(session_status="probing identity")
+            
+            # Send probe WITHOUT session_id (will create temporary session)
+            probe_resp = send_chat_sync("__probe__", npc_id, _NPC_PROBE_MESSAGES[npc_id], None)
             if probe_resp:
                 probe_response = probe_resp.get("npc_response", "")
                 identity_check = verify_npc_identity(npc_id, probe_response)
-                result["identity_verified"] = identity_check
+                result["identity_verified"] = identity_check.get("verified")
+                
+                # Log more informative status
+                verified_str = "✓ OK" if identity_check.get("verified") else "✗ FAILED"
                 set_test_update(
-                    session_status="identity check done",
-                    identity_verified=identity_check.get("verified"),
-                    last_response=f"ID:{identity_check.get('verified')} {probe_response[:80]}"
+                    session_status=f"identity check: {verified_str}",
+                    last_response=probe_response[:100]
                 )
+            
             time.sleep(TEST_IDENTITY_PROBE_DELAY_SECONDS)
         
         if not result["error"]:
@@ -2534,10 +2654,18 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
             
             if end_session_sync(session_id, player_id, npc_id):
                 set_test_update(session_status="waiting for memory processing")
-                time.sleep(TEST_MEMORY_PROCESSING_DELAY_SECONDS)
                 
-                memory = get_memory_sync(player_id, npc_id)
-                result["memory_created"] = memory is not None
+                # Smart retry instead of fixed sleep
+                memory_ready, retry_count, reason = wait_for_memory_with_retry(player_id, npc_id)
+                result["memory_created"] = memory_ready
+                result["memory_retry_attempts"] = retry_count
+                result["memory_retry_reason"] = reason
+                
+                if memory_ready:
+                    memory = get_memory_sync(player_id, npc_id)
+                    is_valid, quality_reason = validate_memory_quality(memory)
+                    result["memory_quality_reason"] = quality_reason
+                
                 player_memories = get_player_memories_sync(player_id)
                 result["player_memories_verified"] = bool(
                     player_memories
@@ -2552,6 +2680,16 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                         or god_memory.get("memories")
                     )
                 )
+                
+                # For cross-session: validate memory persistence
+                if fresh_session:
+                    if not result.get("memory_loaded_on_start"):
+                        print(f"[WARN] {player_id}: Phase 2 started but Phase 1 memory NOT loaded!")
+                        result["memory_persistence_verified"] = False
+                    else:
+                        print(f"[OK] {player_id}: Phase 1 memory persisted to Phase 2")
+                        result["memory_persistence_verified"] = True
+                
                 set_test_update(
                     session_status="memory checks complete",
                     memory_created=result["memory_created"],
