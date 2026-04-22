@@ -50,3 +50,7 @@ done
 echo ""
 echo "=== Ready ==="
 echo "Open: http://localhost:8080/chat_interface.html"
+echo ""
+echo "Alternative commands:"
+echo "  python scripts/server_manager.py status"
+echo "  python gamesurf_agent.py test"

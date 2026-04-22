@@ -377,6 +377,63 @@
         .chat-messages::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+        .debug-panel {
+            display: none;
+            background: #1a1a2e;
+            color: #00ff00;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        .debug-panel.visible {
+            display: block;
+        }
+
+        .debug-panel h4 {
+            color: #00ffff;
+            margin: 0 0 8px 0;
+            font-size: 12px;
+        }
+
+        .debug-panel .debug-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .debug-panel .debug-label {
+            color: #888;
+        }
+
+        .debug-panel .debug-value {
+            color: #00ff00;
+        }
+
+        .debug-toggle {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+
+        .debug-toggle:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -416,31 +473,22 @@
                 <h3>Select NPC</h3>
                 <div class="npc-selector">
                     <div class="npc-option active" data-npc="maestro_jazz_instructor">
-                        🎷 Jazz Historian
+                        🎷 The Maestro
                     </div>
                     <div class="npc-option" data-npc="kosmos_instructor">
-                        ⚡ Greek Mythology
+                        ⚡ Professor Kosmos
                     </div>
                     <div class="npc-option" data-npc="llm_instructor">
-                        🤖 LoRA Instructor
-                    </div>
-                    <div class="npc-option" data-npc="brazilian_history">
-                        🇧🇷 Brazil History
+                        🤖 Professor LoRA
                     </div>
                     <div class="npc-option" data-npc="marvel_comics_instructor">
-                        🦸 Marvel Comics
-                    </div>
-                    <div class="npc-option" data-npc="movies_instructor">
-                        🎬 Movies Instructor
-                    </div>
-                    <div class="npc-option" data-npc="astronomy_instructor">
-                        🔭 Astronomy Instructor
+                        🦸 MarvelOracle
                     </div>
                     <div class="npc-option" data-npc="ai_news_instructor">
                         📰 AI News Analyst
                     </div>
                     <div class="npc-option" data-npc="supabase_instructor">
-                        🗄️ Supabase Master
+                        🗄️ Professor Supabase
                     </div>
                 </div>
             </div>
@@ -469,7 +517,45 @@
                     <button class="control-btn" onclick="resetRuntimeCache()">Reset Runtime Cache</button>
                 </div>
             </div>
+
+            <!-- Debug Panel -->
+            <div class="sidebar-section">
+                <div class="debug-panel" id="debugPanel">
+                    <h4>[DEBUG]</h4>
+                    <div class="debug-row">
+                        <span class="debug-label">Server:</span>
+                        <span class="debug-value" id="debugServer">-</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Model:</span>
+                        <span class="debug-value" id="debugModel">-</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">NPC:</span>
+                        <span class="debug-value" id="debugNpc">-</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Sessions:</span>
+                        <span class="debug-value" id="debugSessions">-</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Requests:</span>
+                        <span class="debug-value" id="debugRequests">-</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">Avg Time:</span>
+                        <span class="debug-value" id="debugTime">-</span>
+                    </div>
+                    <div class="debug-row">
+                        <span class="debug-label">GPU:</span>
+                        <span class="debug-value" id="debugGpu">-</span>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- Debug Toggle -->
+        <button class="debug-toggle" id="debugToggle" title="Toggle Debug Panel">[D]</button>
 
         <!-- Chat Area -->
         <div class="chat-container">
@@ -514,19 +600,21 @@
         let serverModels = {};
         localStorage.setItem('game_surf_player_id', currentPlayerId);
 
+        // Note: This must match what the server returns from /npc-models
         const npcNames = {
             'maestro_jazz_instructor': 'The Maestro',
             'kosmos_instructor': 'Professor Kosmos',
             'llm_instructor': 'Professor LoRA',
-            'brazilian_history': 'Professor Pedro',
-            'marvel_comics_instructor': 'Marvel Comics Instructor',
-            'movies_instructor': 'Professor Reel'
+            'marvel_comics_instructor': 'MarvelOracle',
+            'ai_news_instructor': 'AI News Analyst',
+            'supabase_instructor': 'SupaSage'
         };
 
         // Initialize
         async function initialize() {
             setupNpcSelection();
             setupPlayerNameInput();
+            setupDebugToggle();
             updatePlayerDisplay();
             await loadNpcModels();
             updateDatasetInfo();
@@ -550,6 +638,51 @@
                     await startNewSession();
                 });
             });
+        }
+
+        function setupDebugToggle() {
+            const toggle = document.getElementById('debugToggle');
+            const panel = document.getElementById('debugPanel');
+            toggle.addEventListener('click', () => {
+                panel.classList.toggle('visible');
+                if (panel.classList.contains('visible')) {
+                    refreshDebugPanel();
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'd' && e.shiftKey && e.altKey) {
+                    panel.classList.toggle('visible');
+                    if (panel.classList.contains('visible')) {
+                        refreshDebugPanel();
+                    }
+                }
+            });
+        }
+
+        async function refreshDebugPanel() {
+            try {
+                const statusResp = await fetch(`${API_BASE}/status`);
+                const status = await statusResp.json();
+
+                document.getElementById('debugServer').textContent = status.model_loaded ? 'OK' : 'NO MODEL';
+                document.getElementById('debugModel').textContent = status.model_path ? status.model_path.split('/').pop() : '-';
+                document.getElementById('debugNpc').textContent = status.active_npc_id || 'base';
+
+                const metricsResp = await fetch(`${API_BASE}/metrics`);
+                const metrics = await metricsResp.json();
+
+                document.getElementById('debugSessions').textContent = metrics.active_sessions || 0;
+                document.getElementById('debugRequests').textContent = metrics.requests_total || 0;
+                document.getElementById('debugTime').textContent = metrics.avg_response_time_ms ? `${metrics.avg_response_time_ms}ms` : '-';
+
+                if (metrics.gpu_memory) {
+                    document.getElementById('debugGpu').textContent = `${Math.round(metrics.gpu_memory.allocated_mb)}MB`;
+                } else {
+                    document.getElementById('debugGpu').textContent = '-';
+                }
+            } catch (e) {
+                console.log('Debug panel error:', e);
+            }
         }
 
         function setupPlayerNameInput() {

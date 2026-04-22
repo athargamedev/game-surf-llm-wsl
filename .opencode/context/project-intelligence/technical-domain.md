@@ -97,10 +97,14 @@ See `decisions-log.md` for full decision history with alternatives.
 ## Development Environment
 
 ```
-Setup: pip install -r requirements.txt (or use scripts/setup_dataset_pipeline.py)
-Requirements: Python 3.10+, CUDA 12+, 6GB VRAM GPU
-Local Dev: python run_chat_server.py (starts local LLM server)
-Testing: python test_server.py or test_memory_workflow.py
+# Start both servers (LLM + Chat UI)
+bash scripts/start_servers.sh
+
+# This starts:
+# - LLM server (port 8000) with llama.cpp + LoRA adapters
+# - Chat interface (port 8080)
+
+# Then open: http://127.0.0.1:8080/chat_interface.html
 ```
 
 ## Deployment
@@ -120,7 +124,8 @@ Monitoring: N/A (local training)
 - [ ] Understand major technical decisions and rationale
 - [ ] Know integration points and dependencies
 - [ ] Be able to set up local development environment
-- [ ] Know how to run tests and deploy
+- [ ] Know how to start servers (bash scripts/start_servers.sh)
+- [ ] Check server status: curl http://127.0.0.1:8000/status
 
 ## 📂 Codebase References
 

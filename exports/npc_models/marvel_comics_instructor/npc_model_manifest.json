@@ -23,7 +23,7 @@
   },
   "export": {
     "save_gguf": "",
-    "sync_to_unity": null
+    "sync_to_unity": false
   },
   "artifacts": {
     "output_dir": "exports/surf_llama3b",

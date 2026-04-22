@@ -94,6 +94,9 @@ active_npc_id: str | None = None
 active_lora_adapter_path: str | None = None
 graph_refresh_thread_started = False
 
+request_stats = {"total": 0, "errors": 0, "total_response_time_ms": 0}
+request_timestamps: list[float] = []
+
 STOP_STRINGS = [
     "<|eot_id|>",
     "<|start_header_id|>user<|end_header_id|>",
@@ -791,8 +794,13 @@ def status() -> StatusResponse:
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
+    import time
+    start_time = time.time()
+    request_stats["total"] += 1
+
     select_npc_runtime(request.npc_id)
     if Settings.llm is None:
+        request_stats["errors"] += 1
         raise HTTPException(status_code=500, detail="NPC Brain model is not loaded.")
 
     try:
@@ -837,8 +845,12 @@ def chat(request: ChatRequest) -> ChatResponse:
             except Exception as exc:
                 print(f"Supabase write error: {exc}")
 
+        elapsed_ms = (time.time() - start_time) * 1000
+        request_stats["total_response_time_ms"] += elapsed_ms
+
         return ChatResponse(npc_response=npc_text, session_id=session_id)
     except Exception as exc:
+        request_stats["errors"] += 1
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -1332,6 +1344,126 @@ def reset_memory() -> dict[str, str]:
     chat_engines.clear()
     active_sessions.clear()
     return {"status": "chat memory reset"}
+
+
+def get_gpu_memory_mb() -> dict | None:
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return {
+                "allocated_mb": torch.cuda.memory_allocated() / 1024 / 1024,
+                "reserved_mb": torch.cuda.memory_reserved() / 1024 / 1024,
+                "max_allocated_mb": torch.cuda.max_memory_allocated() / 1024 / 1024,
+            }
+    except Exception:
+        pass
+    return None
+
+
+@app.get("/metrics")
+def get_metrics() -> dict:
+    avg_response_time = 0
+    if request_stats["total"] > 0:
+        avg_response_time = request_stats["total_response_time_ms"] / request_stats["total"]
+
+    return {
+        "requests_total": request_stats["total"],
+        "errors_total": request_stats["errors"],
+        "avg_response_time_ms": round(avg_response_time, 2),
+        "gpu_memory": get_gpu_memory_mb(),
+        "active_sessions": len(active_sessions),
+        "active_chat_engines": len(chat_engines),
+        "npc_registry_size": len(npc_model_registry),
+    }
+
+
+class DebugSessionResponse(BaseModel):
+    session_key: str
+    session_id: str | None
+
+
+@app.get("/debug/sessions")
+def debug_sessions() -> dict:
+    return {
+        "active_sessions": [
+            {"session_key": k, "session_id": v}
+            for k, v in active_sessions.items()
+        ],
+        "session_count": len(active_sessions),
+    }
+
+
+@app.get("/debug/npc-state")
+def debug_npc_state() -> dict:
+    return {
+        "active_npc_id": active_npc_id,
+        "active_lora_adapter_path": active_lora_adapter_path,
+        "model_path": MODEL_PATH,
+        "llm_loaded": llm_loaded,
+        "llm_error": llm_load_error,
+        "gpu_memory": get_gpu_memory_mb(),
+    }
+
+
+@app.get("/debug/memory/{player_id}/{npc_id}")
+def debug_player_memory(player_id: str, npc_id: str) -> dict:
+    try:
+        memory_summary = load_player_context(player_id, npc_id)
+        return {
+            "player_id": player_id,
+            "npc_id": npc_id,
+            "memory_context": memory_summary,
+        }
+    except Exception as exc:
+        return {
+            "player_id": player_id,
+            "npc_id": npc_id,
+            "error": str(exc),
+        }
+
+
+@app.post("/debug/clear-history")
+def debug_clear_history(request: EndSessionRequest) -> dict:
+    key = f"{request.player_id}_{request.npc_id}"
+    chat_engines.pop(key, None)
+    active_sessions.pop(key, None)
+    return {"status": "cleared", "player_id": request.player_id, "npc_id": request.npc_id}
+
+
+@app.post("/debug/clear-all-sessions")
+def debug_clear_all_sessions() -> dict:
+    count = len(active_sessions)
+    chat_engines.clear()
+    active_sessions.clear()
+    return {"status": "cleared_all", "count": count}
+
+
+class ReloadNpcRequest(BaseModel):
+    npc_id: str
+
+
+@app.post("/reload-npc")
+def reload_npc(request: ReloadNpcRequest | None = None) -> dict:
+    npc_id = request.npc_id if request else None
+    result = select_npc_runtime(npc_id=npc_id)
+    return {
+        "status": "ok" if llm_loaded else "error",
+        "active_npc_id": active_npc_id,
+        "active_lora_adapter_path": active_lora_adapter_path,
+        **result,
+    }
+
+
+class ClearPlayerMemoryRequest(BaseModel):
+    player_id: str
+
+
+@app.post("/clear-player-memory")
+def clear_player_memory(request: ClearPlayerMemoryRequest) -> dict:
+    keys_to_remove = [k for k in chat_engines.keys() if k.startswith(request.player_id)]
+    for key in keys_to_remove:
+        chat_engines.pop(key, None)
+    return {"status": "cleared", "player_id": request.player_id, "removed_keys": keys_to_remove}
 
 
 if __name__ == "__main__":
