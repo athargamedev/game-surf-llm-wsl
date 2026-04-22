@@ -18,7 +18,7 @@ tmux new-session -d -s chat-server "cd /root/Game_Surf/Tools/LLM_WSL && CHAT_SER
 
 # Start LLM backend server (port 8000) - IMPORTANT: Set PYTHONPATH for imports
 echo "Starting LLM server on port 8000..."
-tmux new-session -d -s llm-server "cd /root/Game_Surf/Tools/LLM_WSL && PORT=8000 LLM_SERVER_URL=http://127.0.0.1:8000 PYTHONPATH=/root/Game_Surf/Tools/LLM_WSL:\$PYTHONPATH conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
+tmux new-session -d -s llm-server "cd /root/Game_Surf/Tools/LLM_WSL && HOST=127.0.0.1 PORT=8000 LLM_SERVER_URL=http://127.0.0.1:8000 PYTHONPATH=/root/Game_Surf/Tools/LLM_WSL:\$PYTHONPATH conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
 
 # Wait for servers to initialize (LLM needs ~40s to load)
 echo "Waiting for servers to initialize..."

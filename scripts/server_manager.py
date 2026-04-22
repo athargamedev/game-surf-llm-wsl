@@ -181,7 +181,7 @@ def start_llm_server(port: int | None = None, auto: bool = False) -> dict:
 
     run_tmux([
         "new-session", "-d", "-s", "llm-server",
-        f"cd {ROOT} && PORT={target_port} LLM_SERVER_URL=http://127.0.0.1:{target_port} PYTHONPATH={ROOT}:$PYTHONPATH conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
+        f"cd {ROOT} && HOST=127.0.0.1 PORT={target_port} LLM_SERVER_URL=http://127.0.0.1:{target_port} PYTHONPATH={ROOT}:$PYTHONPATH conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
     ])
 
     time.sleep(2)

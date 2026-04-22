@@ -73,6 +73,7 @@ LLM_MAX_NEW_TOKENS = int(os.environ.get("LLM_MAX_NEW_TOKENS", "96"))
 LLAMA_N_GPU_LAYERS = int(os.environ.get("LLAMA_N_GPU_LAYERS", "35"))
 DIRECT_CHAT_MAX_TURNS = int(os.environ.get("DIRECT_CHAT_MAX_TURNS", "6"))
 GRAPH_REFRESH_INTERVAL_SECONDS = int(os.environ.get("GRAPH_REFRESH_INTERVAL_SECONDS", "1800"))
+PRELOAD_NPC_MODELS = os.environ.get("PRELOAD_NPC_MODELS", "false").lower() == "true"
 MEMORY_SLOT = "[MEMORY_CONTEXT: {player_memory_summary}]"
 
 supabase_client: Client | None = None
@@ -749,6 +750,8 @@ def get_chat_engine(player_id: str, npc_id: str):
 
 def preload_all_npc_models() -> None:
     """Preload all trained NPC LoRA adapters at startup to avoid first-request latency."""
+    global MODEL_PATH, active_npc_id, active_lora_adapter_path
+
     print("Preloading all NPC models...")
     load_npc_model_registry()
     
@@ -764,11 +767,14 @@ def preload_all_npc_models() -> None:
         except Exception as exc:
             print(f"  ✗ Error preloading {npc_id}: {exc}")
     
-    # Reset to base model state after preloading
-    global active_npc_id, active_lora_adapter_path
+    # Reset to base model state after preloading. Some adapters may fail to load
+    # under the available VRAM, but that should not leave /status in a failed
+    # state when the base model is usable.
+    MODEL_PATH = normalize_manifest_path(BASE_MODEL_PATH) or BASE_MODEL_PATH
     active_npc_id = None
     active_lora_adapter_path = None
     chat_engines.clear()
+    init_embedding_and_llm()
     
     print(f"Preloaded {preloaded_count}/{len(npc_model_registry)} NPC models")
 
@@ -794,8 +800,8 @@ async def lifespan(app: FastAPI):
     """FastAPI lifespan manager (modern replacement for on_event)."""
     # Startup
     on_startup()
-    # Start preload in background
-    threading.Thread(target=preload_all_npc_models, daemon=True).start()
+    if PRELOAD_NPC_MODELS:
+        threading.Thread(target=preload_all_npc_models, daemon=True).start()
     yield
     # Shutdown
     print("Shutting down...")
