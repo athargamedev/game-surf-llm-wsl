@@ -30,15 +30,6 @@ from typing import Optional
 
 BASE_URL = os.environ.get("LLM_SERVER_URL", "http://127.0.0.1:8000")
 
-# Enable CORS for browser requests from localhost
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8080", "http://localhost:8080", "http://127.0.0.1", "http://localhost"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 TOOLS_LLM_ROOT = Path(__file__).resolve().parents[1]
 NPC_MODEL_MANIFEST_GLOB = "exports/**/npc_model_manifest.json"
 
@@ -1991,6 +1982,13 @@ class TestConfig(BaseModel):
     cross_session: bool = False  # If True: Phase 1=msg1→end, wait; Phase 2=msg2 in NEW session (memory test)
 
 
+def set_test_update(**updates) -> None:
+    with _test_lock:
+        last_update = dict(test_state.get("last_update") or {})
+        last_update.update(updates)
+        test_state["last_update"] = last_update
+
+
 def check_server_health() -> bool:
     global app
     try:
@@ -2047,11 +2045,65 @@ def get_memory_sync(player_id: str, npc_id: str) -> Optional[dict]:
         resp = requests.get(f"{BASE_URL}/debug/memory/{player_id}/{npc_id}", timeout=5)
         if resp.status_code == 200:
             data = resp.json()
-            if data.get("memory_summary"):
+            memory_context = data.get("memory_context") or data.get("memory_summary") or ""
+            if memory_context and memory_context != "No saved player memory.":
                 return data
         return None
     except Exception:
         return None
+
+
+def get_session_history_sync(player_id: str, npc_id: str) -> Optional[dict]:
+    try:
+        resp = requests.get(f"{BASE_URL}/session/history/{player_id}/{npc_id}", timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception:
+        return None
+
+
+def get_player_memories_sync(player_id: str) -> Optional[dict]:
+    try:
+        resp = requests.get(f"{BASE_URL}/players/{player_id}/memories", timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception:
+        return None
+
+
+def get_god_memory_sync(player_id: str, npc_id: str) -> Optional[dict]:
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/memory/god",
+            json={
+                "player_id": player_id,
+                "npc_id": npc_id,
+                "limit": 5,
+                "include_profile": True,
+                "include_recent_npc_memories": True,
+                "include_related_terms": True,
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception:
+        return None
+
+
+def trigger_graph_rebuild_sync() -> bool:
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/graph/rebuild",
+            json={"use_fuzzy_match": True, "use_semantic_match": False},
+            timeout=15,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
 
 
 def run_player_session_thread(player_idx: int, player_id: str, player_name: str, npc_id: str, messages: list[str], fresh_session: bool = False):
@@ -2065,6 +2117,10 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         "messages_sent": messages,
         "responses_received": [],
         "memory_created": False,
+        "memory_loaded_on_start": False,
+        "history_verified": False,
+        "player_memories_verified": False,
+        "god_memory_verified": False,
         "turn_count": 0,
         "duration_seconds": 0,
         "error": None,
@@ -2082,26 +2138,26 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         
         session_id = session_resp.get("session_id")
         result["session_id"] = session_id
-        with _test_lock:
-            test_state["last_update"] = {
-                "player_id": player_id,
-                "npc_id": npc_id,
-                "session_status": "started",
-                "last_message": f"Session {session_id[:8]}..." if session_id else "N/A",
-            }
+        result["memory_loaded_on_start"] = bool(session_resp.get("memory_summary"))
+        set_test_update(
+            player_id=player_id,
+            npc_id=npc_id,
+            session_status="started",
+            last_message=f"Session {session_id[:8]}..." if session_id else "N/A",
+            memory_loaded_on_start=result["memory_loaded_on_start"],
+        )
         
         time.sleep(0.5)
         
         for i, msg in enumerate(messages):
             if msg and msg.strip():
-                with _test_lock:
-                    test_state["last_update"] = {
-                        "player_id": player_id,
-                        "npc_id": npc_id,
-                        "session_status": f"sending message {i+1}/{len(messages)}",
-                        "last_message": msg,
-                        "last_response": None,
-                    }
+                set_test_update(
+                    player_id=player_id,
+                    npc_id=npc_id,
+                    session_status=f"sending message {i+1}/{len(messages)}",
+                    last_message=msg,
+                    last_response=None,
+                )
                 
                 chat_resp = send_chat_sync(player_id, npc_id, msg, session_id)
                 if not chat_resp:
@@ -2111,22 +2167,41 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                 npc_response = chat_resp.get("npc_response", "")
                 result["responses_received"].append(npc_response)
                 result["turn_count"] += 1
-                with _test_lock:
-                    test_state["last_update"]["last_response"] = npc_response
+                set_test_update(last_response=npc_response)
 
                 time.sleep(5)
         
         if not result["error"]:
-            with _test_lock:
-                test_state["last_update"]["session_status"] = "ending session"
+            history = get_session_history_sync(player_id, npc_id)
+            result["history_verified"] = bool(history and len(history.get("turns") or []) >= result["turn_count"])
+            set_test_update(session_status="ending session", history_verified=result["history_verified"])
             
             if end_session_sync(session_id, player_id, npc_id):
-                with _test_lock:
-                    test_state["last_update"]["session_status"] = "waiting for memory processing"
+                set_test_update(session_status="waiting for memory processing")
                 time.sleep(15)
                 
                 memory = get_memory_sync(player_id, npc_id)
                 result["memory_created"] = memory is not None
+                player_memories = get_player_memories_sync(player_id)
+                result["player_memories_verified"] = bool(
+                    player_memories
+                    and any(m.get("npc_id") == npc_id for m in player_memories.get("memories", []))
+                )
+                god_memory = get_god_memory_sync(player_id, npc_id)
+                result["god_memory_verified"] = bool(
+                    god_memory
+                    and (
+                        god_memory.get("profile")
+                        or god_memory.get("recent_npc_memories")
+                        or god_memory.get("memories")
+                    )
+                )
+                set_test_update(
+                    session_status="memory checks complete",
+                    memory_created=result["memory_created"],
+                    player_memories_verified=result["player_memories_verified"],
+                    god_memory_verified=result["god_memory_verified"],
+                )
             else:
                 result["error"] = "Failed to end session"
         
@@ -2154,8 +2229,40 @@ def run_full_test_thread(config: dict):
         test_state["running"] = False
         return
     
-    test_state["total_expected"] = len(npc_configs) * num_players
+    test_state["total_expected"] = len(npc_configs) * num_players * (2 if cross_session else 1)
     test_state["cross_session"] = cross_session
+    set_test_update(
+        player_id="---",
+        npc_id="---",
+        session_status="checking server and Supabase",
+        last_message="Running preflight checks...",
+    )
+    status_ok = False
+    try:
+        status_resp = requests.get(f"{BASE_URL}/status", timeout=10)
+        status_data = status_resp.json() if status_resp.status_code == 200 else {}
+        status_ok = bool(status_data.get("supabase_enabled") and status_data.get("supabase_connected"))
+    except Exception:
+        status_ok = False
+    if not check_server_health() or not status_ok:
+        with _test_lock:
+            test_state["results"].append({
+                "player_id": "preflight",
+                "player_name": player_name_base,
+                "session_id": None,
+                "npc_id": None,
+                "turn_count": 0,
+                "memory_created": False,
+                "memory_loaded_on_start": False,
+                "history_verified": False,
+                "player_memories_verified": False,
+                "god_memory_verified": False,
+                "duration_seconds": 0,
+                "error": "Preflight failed: server healthy but Supabase is not enabled/connected",
+            })
+            test_state["running"] = False
+            test_state["phase"] = "failed"
+        return
     
     # Cross-session: Phase 1 = msg1 for all, wait, Phase 2 = msg2 for all
     if cross_session:
@@ -2214,6 +2321,7 @@ def run_full_test_thread(config: dict):
                         "last_message": "Phase 1 complete — processing memories...",
                     }
                 time.sleep(20)
+                trigger_graph_rebuild_sync()
     else:
         # Normal: msg1 + msg2 in same session per player
         for npc_idx, npc_config in enumerate(npc_configs):
@@ -2248,6 +2356,7 @@ def run_full_test_thread(config: dict):
             if npc_idx < len(npc_configs) - 1 and test_state["running"]:
                 time.sleep(3)
     
+    trigger_graph_rebuild_sync()
     test_state["running"] = False
     test_state["phase"] = "complete"
 
@@ -2302,6 +2411,10 @@ async def api_test_status():
                 "session_status": r.get("session_status", r.get("last_message", "")),
                 "turn_count": r["turn_count"],
                 "memory_created": r["memory_created"],
+                "memory_loaded_on_start": r.get("memory_loaded_on_start", False),
+                "history_verified": r.get("history_verified", False),
+                "player_memories_verified": r.get("player_memories_verified", False),
+                "god_memory_verified": r.get("god_memory_verified", False),
                 "error": r.get("error"),
                 "duration_seconds": round(r["duration_seconds"], 1),
             }
