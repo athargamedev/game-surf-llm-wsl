@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import hashlib
 import json
 from pathlib import Path
@@ -222,8 +223,97 @@ def parse_args() -> argparse.Namespace:
         choices=["content", "messages", "response"],
         help="Field to use for deduplication",
     )
+    parser.add_argument(
+        "--min-task-examples",
+        type=int,
+        default=0,
+        help="Require at least this many examples per task_type after filtering.",
+    )
 
     return parser.parse_args()
+
+
+def _normalized_text(value: str) -> str:
+    return " ".join(value.lower().split())
+
+
+def build_dataset_report(dataset: Dataset) -> dict[str, Any]:
+    task_counter: Counter[str] = Counter()
+    scope_counter: Counter[str] = Counter()
+    source_counter: Counter[str] = Counter()
+    user_lengths: list[int] = []
+    assistant_lengths: list[int] = []
+    unique_users: set[str] = set()
+    unique_assistants: set[str] = set()
+    memory_slot_count = 0
+
+    for example in dataset:
+        metadata = example.get("metadata", {}) or {}
+        task_counter[str(metadata.get("task_type", "unknown"))] += 1
+        scope_counter[str(metadata.get("npc_scope", "unknown"))] += 1
+        source_counter[str(metadata.get("source_kind", "unknown"))] += 1
+
+        messages = example.get("messages", []) or []
+        system = next((msg.get("content", "") for msg in messages if msg.get("role") == "system"), "")
+        user = next((msg.get("content", "") for msg in messages if msg.get("role") == "user"), "")
+        assistant = next((msg.get("content", "") for msg in messages if msg.get("role") == "assistant"), "")
+
+        if "[MEMORY_CONTEXT:" in system:
+            memory_slot_count += 1
+        user_lengths.append(len(user.split()))
+        assistant_lengths.append(len(assistant.split()))
+        if user:
+            unique_users.add(_normalized_text(user))
+        if assistant:
+            unique_assistants.add(_normalized_text(assistant))
+
+    total = len(dataset)
+    return {
+        "npc_scope_distribution": dict(sorted(scope_counter.items())),
+        "task_distribution": dict(sorted(task_counter.items())),
+        "source_distribution": dict(sorted(source_counter.items())),
+        "average_user_words": round(sum(user_lengths) / len(user_lengths), 2) if user_lengths else 0.0,
+        "average_assistant_words": round(sum(assistant_lengths) / len(assistant_lengths), 2) if assistant_lengths else 0.0,
+        "unique_user_count": len(unique_users),
+        "unique_assistant_count": len(unique_assistants),
+        "memory_slot_rate": round(memory_slot_count / total, 3) if total else 0.0,
+    }
+
+
+def summarize_dataset_metadata(report: dict[str, Any], default_scope: str, default_task: str) -> tuple[str, str]:
+    scope_distribution = report.get("npc_scope_distribution", {}) or {}
+    task_distribution = report.get("task_distribution", {}) or {}
+
+    if len(scope_distribution) == 1:
+        npc_scope = next(iter(scope_distribution))
+    else:
+        npc_scope = default_scope
+
+    if len(task_distribution) == 1:
+        task_type = next(iter(task_distribution))
+    elif task_distribution:
+        task_type = "mixed"
+    else:
+        task_type = default_task
+
+    return npc_scope, task_type
+
+
+def enforce_task_minimums(dataset: Dataset, minimum: int) -> None:
+    if minimum <= 0:
+        return
+
+    counts: Counter[str] = Counter(
+        str((example.get("metadata") or {}).get("task_type", "unknown"))
+        for example in dataset
+    )
+    failing = {task_type: count for task_type, count in counts.items() if count < minimum}
+    if failing:
+        details = ", ".join(f"{task_type}={count}" for task_type, count in sorted(failing.items()))
+        raise ValueError(
+            "Task coverage check failed after filtering/deduplication. "
+            f"Required >= {minimum} examples per task_type, found: {details}"
+        )
 
 
 def detect_format(path: Path) -> str:
@@ -637,6 +727,20 @@ def main() -> None:
             f"[DEDUP] {before_dedup} -> {after_dedup} ({before_dedup - after_dedup} duplicates removed)"
         )
 
+    enforce_task_minimums(processed, args.min_task_examples)
+    report = build_dataset_report(processed)
+    meta_npc_scope, meta_task_type = summarize_dataset_metadata(
+        report,
+        args.npc_scope,
+        args.task_type,
+    )
+    print(f"[REPORT] Task distribution: {report['task_distribution']}")
+    print(
+        "[REPORT] Avg words "
+        f"user={report['average_user_words']}, assistant={report['average_assistant_words']} "
+        f"memory_slot_rate={report['memory_slot_rate']}"
+    )
+
     # Split (use stratified if requested)
     print("\n[4/4] Creating splits...")
     if args.stratify_by:
@@ -666,10 +770,11 @@ def main() -> None:
     meta_path = output_dir / "metadata.json"
     meta = {
         "format": "chatml",
-        "npc_scope": args.npc_scope,
-        "task_type": args.task_type,
+        "npc_scope": meta_npc_scope,
+        "task_type": meta_task_type,
         "total_examples": len(processed),
         "splits": {k: len(v) for k, v in splits.items()},
+        "report": report,
     }
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"\nSaved metadata to {meta_path}")

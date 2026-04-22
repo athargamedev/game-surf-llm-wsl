@@ -61,6 +61,19 @@ conda run --no-capture-output -n unsloth_env python \
   --prepare
 ```
 
+### Stricter Import And Prep Gates
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  --npc maestro_jazz_instructor \
+  --input research/maestro_jazz_instructor/notebooklm_batch_*.jsonl \
+  --import \
+  --prepare \
+  --min-quality 0.78 \
+  --min-task-examples 8
+```
+
 ### Smoke Training (2 steps)
 
 ```bash
@@ -102,6 +115,9 @@ notebooklm list
 - No duplicate questions
 - No duplicate answers
 - No AI/model/dataset mentions in assistant text
+- Heuristic import quality should average roughly `0.80+`
+- Keep both `teaching` and `quiz` represented after filtering
+- Preparation can now enforce minimum per-task coverage with `--min-task-examples`
 
 ---
 
@@ -132,3 +148,4 @@ Leave slot literal - runtime Supabase memory will be inserted later.
 
 - Prompt template: `references/notebooklm_prompt.md`
 - Workflow script: `.codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py`
+- Audit command: `python scripts/audit_dataset_workflow.py --format markdown --output docs/dataset_workflow_audit.md`

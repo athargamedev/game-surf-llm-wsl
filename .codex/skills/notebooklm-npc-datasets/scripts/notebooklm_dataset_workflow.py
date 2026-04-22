@@ -283,6 +283,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prepare", action="store_true")
     parser.add_argument("--smoke-train", action="store_true")
     parser.add_argument("--dry-import", action="store_true", help="Only run importer dry-run.")
+    parser.add_argument("--min-quality", type=float, default=0.75, help="Minimum importer/prep quality threshold.")
+    parser.add_argument("--min-task-examples", type=int, default=5, help="Minimum examples per task type after import filtering.")
     return parser.parse_args()
 
 
@@ -323,7 +325,16 @@ def main() -> int:
         print("No input JSONL files supplied. Use --input, --run-notebooklm, or --write-prompt-only.")
         return 0
 
-    import_cmd = [sys.executable, str(IMPORTER), "--npc", args.npc, "--input", *map(str, inputs)]
+    import_cmd = [
+        sys.executable,
+        str(IMPORTER),
+        "--npc",
+        args.npc,
+        "--min-quality",
+        str(args.min_quality),
+        "--input",
+        *map(str, inputs),
+    ]
     run([*import_cmd, "--dry-run"], check=True)
 
     if args.dry_import:
@@ -347,12 +358,14 @@ def main() -> int:
             "--test-split",
             "0.0",
             "--quality-threshold",
-            "0.75",
+            str(args.min_quality),
             "--deduplicate",
             "--dedup-by",
             "response",
             "--stratify-by",
             "task_type",
+            "--min-task-examples",
+            str(args.min_task_examples),
         ], check=True)
 
     if args.smoke_train:

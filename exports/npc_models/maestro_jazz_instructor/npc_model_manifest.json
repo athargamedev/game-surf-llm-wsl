@@ -1,13 +1,13 @@
 {
   "npc_key": "maestro_jazz_instructor",
-  "artifact_key": "maestro_jazz_instructor",
+  "artifact_key": "jazz_history_instructor",
   "dataset_name": "jazz_history_dataset",
   "supabase_npc_id": "maestro_jazz_instructor",
   "version": "1.0.0",
   "base_model": "unsloth/Llama-3.2-3B-Instruct",
   "dataset": {
-    "target_generation_count": 150,
-    "quality_threshold": 0.75,
+    "target_generation_count": 111,
+    "quality_threshold": 0.78,
     "val_split": 0.1,
     "raw_dataset_path": "/root/Game_Surf/Tools/LLM_WSL/datasets/personas/jazz_history_instructor/jazz_history_dataset.jsonl",
     "processed_dir": "/root/Game_Surf/Tools/LLM_WSL/datasets/processed/jazz_history_dataset",
@@ -23,7 +23,7 @@
   },
   "export": {
     "save_gguf": "",
-    "sync_to_unity": true
+    "sync_to_unity": null
   },
   "artifacts": {
     "output_dir": "exports/npc_models/maestro_jazz_instructor",
@@ -35,7 +35,7 @@
     "lora_adapter_path": "exports/npc_models/maestro_jazz_instructor/lora_adapter/adapter_model.gguf",
     "relay_model_path": "exports/npc_models/maestro_jazz_instructor/gguf",
     "unity_model_name": null,
-    "unity_lora_name": "LLM/loras/maestro_jazz_instructor/adapter_model.gguf"
+    "unity_lora_name": "LLM/loras/jazz_history_instructor/adapter_model.safetensors"
   },
   "profile": {
     "display_name": "The Maestro",

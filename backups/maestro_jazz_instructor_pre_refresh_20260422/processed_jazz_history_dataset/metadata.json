@@ -1,0 +1,10 @@
+{
+  "format": "chatml",
+  "npc_scope": "world",
+  "task_type": "mixed",
+  "total_examples": 50,
+  "splits": {
+    "train": 46,
+    "validation": 4
+  }
+}

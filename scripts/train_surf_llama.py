@@ -1172,24 +1172,31 @@ def load_model_and_tokenizer(args: argparse.Namespace, max_seq_length: int):
     """
     import torch
     import gc
-    
+    free_vram_gb = get_free_vram_gb()
+
     # Tier 1: float16 without quantization
-    print("  [Loading] Tier 1: float16 on GPU (5GB limit)...")
-    try:
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=args.model_name,
-            max_seq_length=max_seq_length,
-            dtype=torch.float16,
-            load_in_4bit=False,
-            device_map="auto",
-            max_memory={0: "5GB"},
+    if free_vram_gb >= 5.5:
+        print("  [Loading] Tier 1: float16 on GPU (5GB limit)...")
+        try:
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=args.model_name,
+                max_seq_length=max_seq_length,
+                dtype=torch.float16,
+                load_in_4bit=False,
+                device_map={"": 0},
+                max_memory={0: "5GB"},
+            )
+            print("  [OK] Tier 1 succeeded (float16)")
+            return _finish_model_setup(model, tokenizer, args)
+        except Exception as e:
+            print(f"  [WARN] Tier 1 failed: {e}")
+            gc.collect()
+            torch.cuda.empty_cache()
+    else:
+        print(
+            f"  [Loading] Skipping Tier 1 float16 because only {free_vram_gb:.2f} GB VRAM is free; "
+            "going straight to 4-bit loading."
         )
-        print("  [OK] Tier 1 succeeded (float16)")
-        return _finish_model_setup(model, tokenizer, args)
-    except Exception as e:
-        print(f"  [WARN] Tier 1 failed: {e}")
-        gc.collect()
-        torch.cuda.empty_cache()
     
     # Tier 2: 4-bit quantization on GPU
     print("  [Loading] Tier 2: 4-bit on GPU (4GB limit)...")
@@ -1199,9 +1206,7 @@ def load_model_and_tokenizer(args: argparse.Namespace, max_seq_length: int):
             max_seq_length=max_seq_length,
             dtype=torch.float16,
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
-            device_map="auto",
+            device_map={"": 0},
             max_memory={0: "4GB"},
         )
         print("  [OK] Tier 2 succeeded (4-bit)")
@@ -1219,8 +1224,6 @@ def load_model_and_tokenizer(args: argparse.Namespace, max_seq_length: int):
             max_seq_length=max_seq_length,
             dtype=torch.float16,
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
             device_map="balanced",  # Spreads layers across GPU + CPU RAM
             max_memory={0: "2GB", "cpu": "30GB"},  # Keep only 2GB on GPU
             offload_folder="outputs/offload",
@@ -1296,6 +1299,14 @@ def create_trainer(
 
     # Determine packing setting
     use_packing = args.packing and not args.no_packing
+    model_dtype = None
+    for parameter in model.parameters():
+        if parameter.is_floating_point() and not parameter.is_meta:
+            model_dtype = parameter.dtype
+            break
+
+    use_bf16 = model_dtype == torch.bfloat16
+    use_fp16 = not use_bf16
 
     # SFT Config with optimizations
     sft_kwargs = {
@@ -1310,8 +1321,8 @@ def create_trainer(
         "seed": args.seed,
         "output_dir": str(output_dir),
         "report_to": "none",
-        "fp16": not is_bfloat16_supported(),
-        "bf16": is_bfloat16_supported(),
+        "fp16": use_fp16,
+        "bf16": use_bf16,
         "max_grad_norm": 1.0,  # Gradient clipping for stability
         # OPTIMIZATION: Checkpointing
         "save_strategy": "steps",
