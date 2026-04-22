@@ -7,7 +7,7 @@ import sys
 import os
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, cast
 
 ROOT = Path("/root/Game_Surf/Tools/LLM_WSL")
 NPC_PROFILES = ROOT / "datasets" / "configs" / "npc_profiles.json"
@@ -18,7 +18,7 @@ class PhaseResult:
     phase: str
     passed: bool
     message: str = ""
-    details: dict = None
+    details: dict[str, Any] | None = None
 
     def __post_init__(self):
         if self.details is None:
@@ -94,11 +94,11 @@ def test_dataset_exists(npc_id: str = "marvel_comics_instructor") -> PhaseResult
         return PhaseResult("Phase1-Dataset", False, f"Not found: {raw_path}")
 
 
-def test_prepared_dataset(npc_id: str = "marvel_comics_instructor", dataset_name: str = None) -> PhaseResult:
+def test_prepared_dataset(npc_id: str = "marvel_comics_instructor", dataset_name: str | None = None) -> PhaseResult:
     log(f"Checking prepared dataset for {npc_id}...")
     if dataset_name is None:
         profiles = load_profiles()
-        dataset_name = profiles.get(npc_id, {}).get('dataset_name', f"{npc_id}_dataset")
+        dataset_name = cast(str, profiles.get(npc_id, {}).get('dataset_name', f"{npc_id}_dataset"))
 
     processed_dir = ROOT / "datasets" / "processed" / dataset_name
     train_file = processed_dir / "train.jsonl"

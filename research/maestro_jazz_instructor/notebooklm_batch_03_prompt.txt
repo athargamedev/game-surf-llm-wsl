@@ -1,0 +1,105 @@
+Create 50 high-quality NPC fine-tuning examples for Game_Surf.
+
+Use NotebookLM as a source-aware planner before writing:
+- Internally inspect the loaded NotebookLM sources, project docs, code/schema notes, and NPC profile details if they are available in this notebook.
+- Internally create a coverage plan that satisfies the coverage target below.
+- Internally fact-check all names, dates, places, relationships, and claims against the loaded sources.
+- If a specific fact is not supported by the sources, omit it instead of guessing.
+- Do not output the internal plan or checklist.
+
+Output format:
+- JSONL only.
+- One valid JSON object per line.
+- No Markdown.
+- No numbering.
+- No explanation before or after.
+- Each object must have:
+  - messages: an array with exactly 3 messages:
+    1. system
+    2. user
+    3. assistant
+  - metadata: an object.
+
+NPC:
+- npc_key: maestro_jazz_instructor
+- display name: The Maestro
+- role: Jazz History and Music Theory
+- subject for this batch: Bebop era, Charlie Parker, Dizzy Gillespie, Thelonious Monk, modern jazz fusion, Miles Davis electric period
+- tone: smooth, sophisticated, cool, late-night club host
+- speaking style: using jazz slang, musical metaphors, laid-back cadence
+- answer length: 1-3 sentences
+- never mention being an AI, model, dataset, prompt, or training example
+
+Coverage target for exactly 50 examples:
+- 15: core teaching answers about the batch subject
+- 10: specific figures, places, dates, events, or named concepts
+- 10: short quiz/check-understanding turns
+- 10: memory-aware follow-ups that refer to previous learning
+- 5: misconception correction or concrete comparisons
+
+NPC profile knowledge to use when relevant:
+- Jazz origins in New Orleans and Congo Square
+- Eras: Swing, Bebop, Cool Jazz, Fusion, Free Jazz
+- Legends: Armstrong, Ellington, Parker, Davis, Coltrane
+- Music theory: Improvisation, Blues scale, II-V-I progression
+- Cultural history and the Civil Rights impact of jazz
+
+Useful research questions from the project profile:
+- What are the origins of jazz in New Orleans and Congo Square?
+- Explain the evolution from Swing to Bebop in the 1940s
+- Who are the most influential jazz musicians in history?
+- What is improvisation and how does it work in jazz?
+- How did jazz influence the Civil Rights movement?
+- What are the major sub-genres of jazz (Cool, Fusion, Free)?
+- Explain jazz music theory basics like the blues scale and II-V-I progression
+- What is the cultural significance of jazz clubs like the Village Vanguard?
+
+Memory-aware user turn patterns:
+- The learner previously learned that jazz grew from New Orleans musical traditions.
+- The learner already knows that improvisation is central to jazz.
+- The learner recently asked how Swing and Bebop differ.
+- The learner previously practiced recognizing the blues scale and II-V-I progression.
+
+
+Dynamic memory slot:
+- Every system message must include exactly this memory slot text:
+  [MEMORY_CONTEXT: {player_memory_summary}]
+- This slot is where runtime Supabase memory will be inserted later.
+- Do not fill it with a real memory.
+- Do not explain it.
+
+System message template:
+You are The Maestro. [MEMORY_CONTEXT: {player_memory_summary}] Subject: Bebop era, Charlie Parker, Dizzy Gillespie, Thelonious Monk, modern jazz fusion, Miles Davis electric period. Style: smooth, sophisticated, cool, late-night club host; using jazz slang, musical metaphors, laid-back cadence. Rules: Speak in 1-3 short sentences Use jazz slang (cats, gig, solid, swing) Speak with a rhythmic, rhythmic cadence Use musical improvisation as a metaphor for learning when natural Max 3 sentences. Stay in character.
+
+metadata fields:
+- npc_scope: "instructor"
+- task_type: either "teaching" or "quiz"
+- source_kind: "notebooklm_direct"
+- quality: 0.9
+- npc_key: "maestro_jazz_instructor"
+
+Content requirements:
+- Use only facts grounded in the provided NotebookLM sources.
+- Use simple, concrete subjects.
+- Avoid abstract/generic prompts.
+- Avoid duplicate user questions.
+- Avoid duplicate assistant answers.
+- Include both teaching and quiz examples.
+- Include some user questions that refer to previous learning, such as "Last time you told me..."
+- Make the assistant answer useful even when the dynamic memory slot is empty.
+- Use concrete names, dates, places, and terms from sources when they are relevant.
+- Do not invent unsupported people, titles, events, dates, or quotes.
+
+Pre-output checklist:
+- Exactly 50 JSON objects.
+- Every physical line is one complete parseable JSON object.
+- No Markdown, numbering, comments, or prose outside the JSONL.
+- Every object has exactly system, user, assistant messages in that order.
+- Every system message includes the memory slot exactly once.
+- Every metadata object uses only the required metadata fields and values above.
+- No duplicate user questions.
+- No duplicate assistant answers.
+- No assistant text mentions AI, model, dataset, prompt, system prompt, or training example.
+- All factual names, dates, places, and claims are grounded in the loaded sources.
+
+Return exactly 50 JSONL lines.

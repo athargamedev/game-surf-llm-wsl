@@ -6,6 +6,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 try:
     from playwright.async_api import async_playwright, expect, Page
@@ -19,10 +20,10 @@ CHAT_URL = f"{BASE_URL}/chat_interface.html"
 
 @dataclass
 class TestResult:
-    name: str
     passed: bool
     message: str = ""
-    details: dict = None
+    details: dict[str, Any] | None = None
+    name: str = ""
 
     def __post_init__(self):
         if self.details is None:
@@ -36,7 +37,7 @@ async def log(msg: str):
 class ChatInterfaceTester:
     def __init__(self):
         self.results: list[TestResult] = []
-        self.page: Page = None
+        self.page: Page = cast(Page, None)
 
     async def setup(self):
         pw = await async_playwright().start()
@@ -47,7 +48,9 @@ class ChatInterfaceTester:
 
     async def teardown(self):
         if self.page:
-            await self.page.context.browser.close()
+            browser = self.page.context.browser
+            if browser:
+                await browser.close()
 
     async def test_page_loads(self) -> TestResult:
         await log("Testing page loads...")
@@ -76,8 +79,9 @@ class ChatInterfaceTester:
             await self.page.wait_for_timeout(500)
 
             active = await self.page.locator('.npc-option.active').text_content()
-            if "Greek Mythology" in active:
-                return TestResult(True, "NPC selection works", {"selected": active.strip()})
+            active_text = active or ""
+            if "Greek Mythology" in active_text:
+                return TestResult(True, "NPC selection works", {"selected": active_text.strip()})
             return TestResult(False, f"Selection failed: {active}")
         except Exception as e:
             return TestResult(False, f"Selection error: {e}")
@@ -93,8 +97,9 @@ class ChatInterfaceTester:
             await self.page.wait_for_timeout(500)
 
             display = await self.page.locator("#currentPlayerDisplay").text_content()
-            if "TestPlayer" in display:
-                return TestResult(True, "Player name set", {"name": display.strip()})
+            display_text = display or ""
+            if "TestPlayer" in display_text:
+                return TestResult(True, "Player name set", {"name": display_text.strip()})
             return TestResult(False, f"Name not set: {display}")
         except Exception as e:
             return TestResult(False, f"Input error: {e}")
@@ -128,7 +133,7 @@ class ChatInterfaceTester:
             is_visible = await status_card.is_visible()
             if is_visible:
                 text = await status_card.text_content()
-                return TestResult(True, "Status card visible", {"status": text.strip()[:50]})
+                return TestResult(True, "Status card visible", {"status": (text or "").strip()[:50]})
             return TestResult(False, "Status card not visible")
         except Exception as e:
             return TestResult(False, f"Status error: {e}")
@@ -204,7 +209,7 @@ class ChatInterfaceTester:
             is_visible = await dataset_info.first.is_visible()
             if is_visible:
                 text = await dataset_info.first.text_content()
-                return TestResult(True, "Dataset info visible", {"info": text.strip()[:50]})
+                return TestResult(True, "Dataset info visible", {"info": (text or "").strip()[:50]})
             return TestResult(False, "Dataset info not visible")
         except Exception as e:
             return TestResult(False, f"Info error: {e}")
@@ -261,7 +266,7 @@ class ChatInterfaceTester:
                 self.results.append(result)
             except Exception as e:
                 print(f"  [✗] {name}: EXCEPTION - {e}")
-                self.results.append(TestResult(name, False, str(e)))
+                self.results.append(TestResult(False, str(e), name=name))
 
         await self.teardown()
 

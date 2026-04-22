@@ -14,10 +14,10 @@ TIMEOUT = 30
 
 @dataclass
 class TestResult:
-    name: str
     passed: bool
     message: str = ""
-    details: dict = None
+    details: dict[str, Any] | str | None = None
+    name: str = ""
 
     def __post_init__(self):
         if self.details is None:
@@ -153,7 +153,7 @@ class TestRunner:
             resp = requests.post(f"{BASE_URL}/chat/stream", json=payload, timeout=TIMEOUT, stream=True)
             if resp.status_code == 200:
                 chunks = []
-                for chunk in resp.iter_content(chunk_size=None, text=True):
+                for chunk in resp.iter_content(chunk_size=None, decode_unicode=True):
                     if chunk and not chunk.startswith("data:"):
                         chunks.append(chunk.strip())
                     if len(chunks) > 5:

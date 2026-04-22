@@ -299,7 +299,7 @@ def server_logs(session: str, lines: int = 50) -> str:
     if not session_running(session):
         return f"Session {session} not running"
 
-    result = run_tmux(["capture-pane", "-t", session, "-p", "-S", str(-lines)])
+    result = run_tmux(["capture-pane", "-t", session, "-p", "-S", str(-lines)], capture=True)
     if result.returncode == 0:
         return result.stdout
     return f"Error getting logs: {result.stderr}"

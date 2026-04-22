@@ -20,7 +20,7 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 50,
+      "sample_count": 25,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - The Maestro"
@@ -86,10 +86,21 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 77,
+      "sample_count": 58,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - AI News Analyst"
+    },
+    {
+      "name": "marvel_lore_dataset",
+      "path": "datasets/personas/marvel_comics_instructor/marvel_lore_dataset.jsonl",
+      "task_type": "mixed",
+      "npc_scope": "instructor",
+      "format": "chatml",
+      "sample_count": 60,
+      "weight": 1.0,
+      "source_kind": "notebooklm_direct",
+      "_note": "Imported from NotebookLM direct JSONL - MarvelOracle"
     }
   ]
 }

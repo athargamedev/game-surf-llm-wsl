@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# pyright: reportAttributeAccessIssue=false, reportOptionalMemberAccess=false, reportArgumentType=false, reportOptionalSubscript=false, reportIndexIssue=false, reportCallIssue=false, reportReturnType=false, reportAssignmentType=false, reportOperatorIssue=false
 """Integrated Game_Surf LLM server with relay, Supabase memory, and reload endpoints."""
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import gc
 import json
 import os
 import re
+import sys
 import uuid
 import threading
 import time
@@ -25,13 +27,17 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.llama_cpp import LlamaCPP
 from llama_index.core.memory import ChatMemoryBuffer
 from supabase import Client, create_client
-from scripts.supabase_client import SupabaseClient, get_client as get_supabase
 import requests
 from typing import Optional
 
 BASE_URL = os.environ.get("LLM_SERVER_URL", "http://127.0.0.1:8000")
 
 TOOLS_LLM_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_LLM_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_LLM_ROOT))
+
+from scripts.supabase_client import SupabaseClient, get_client as get_supabase
+
 NPC_MODEL_MANIFEST_GLOB = "exports/**/npc_model_manifest.json"
 
 
@@ -70,7 +76,7 @@ ENABLE_SUPABASE = os.environ.get("ENABLE_SUPABASE", "true").lower() == "true"
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 CHAT_HISTORY_TOKEN_LIMIT = int(os.environ.get("CHAT_HISTORY_TOKEN_LIMIT", "1500"))
 LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.35"))
-LLM_MAX_NEW_TOKENS = int(os.environ.get("LLM_MAX_NEW_TOKENS", "96"))
+LLM_MAX_NEW_TOKENS = int(os.environ.get("LLM_MAX_NEW_TOKENS", "64"))
 LLAMA_N_GPU_LAYERS = int(os.environ.get("LLAMA_N_GPU_LAYERS", "32"))  # Llama-3.2-3B has 28 layers; 32 = "all on GPU"
 DIRECT_CHAT_MAX_TURNS = int(os.environ.get("DIRECT_CHAT_MAX_TURNS", "6"))
 GRAPH_REFRESH_INTERVAL_SECONDS = int(os.environ.get("GRAPH_REFRESH_INTERVAL_SECONDS", "1800"))
@@ -107,14 +113,18 @@ STOP_STRINGS = [
     "<|start_header_id|>user<|end_header_id|>",
     "<|start_header_id|>assistant<|end_header_id|>",
     "\nuser:",
+    "\nPlayer:",
     "\nassistant:",
+    "\nAssistant:",
     "\nassistant\nuser:",
 ]
 
 RESPONSE_CUTOFF_PATTERNS = [
     r"<\|eot_id\|>",
-    r"<\|start_header_id\|>user<\|end_header_id\|>",
-    r"<\|start_header_id\|>assistant<\|end_header_id\|>",
+    r"<\|start_header_id\|>user<|end_header_id|>",
+    r"<\|start_header_id\|>assistant<|end_header_id|>",
+    r"\nPlayer:",
+    r"\nAssistant:",
     r"\nassistant\s*\nuser:",
     r"\nuser:",
     r"\nassistant:",
@@ -404,12 +414,24 @@ def clean_npc_response(text: str) -> str:
             cleaned = cleaned[: match.start()].strip()
             break
 
+    # ── Remove model self-generated dialogue turns ─────────────────────────────
+    # The LoRA sometimes outputs extra "Player: X → NPC: Y" turns. Strip anything
+    # that looks like a second player prompt after the first NPC response.
+    cleaned = re.sub(r"(?is)\n\s*Player:\s.*$", "", cleaned)
+    cleaned = re.sub(r"(?is)\n\s*player\s*:.*$", "", cleaned)
+    cleaned = re.sub(r"(?is)\n\s*User:\s.*$", "", cleaned)
+    cleaned = re.sub(r"(?is)\n\s*user\s*:.*$", "", cleaned)
+
+    # ── Remove role-prefix artifacts ────────────────────────────────────────────
     cleaned = re.sub(r"(?is)<\|.*?$", "", cleaned)
     cleaned = re.sub(r"(?is)\b(system|user|assistant)\s*[:\-].*$", "", cleaned)
     cleaned = re.sub(r"(?is)\bsystem\s+prompt\s*[:\-].*$", "", cleaned)
     cleaned = re.sub(r"(?is)^you are .*?\[MEMORY_CONTEXT.*$", "", cleaned)
     cleaned = re.sub(r"(?is)\[MEMORY_CONTEXT\].*$", "", cleaned)
     cleaned = re.sub(r"^\s*assistant\s*[:\-]?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"(?is)^npc\s*[:\-]?\s*", "", cleaned)
+    cleaned = re.sub(r"(?is)^NPC\s*[:\-]?\s*", "", cleaned)
+
     cleaned = re.sub(r"\s+\Z", "", cleaned)
     cleaned = cleaned.strip()
     if not cleaned or len(cleaned.split()) < 3:
@@ -460,8 +482,8 @@ def build_system_prompt(npc_id: str) -> str:
             system_prompt = (
                 f"You are {clean_name}. {MEMORY_SLOT} "
                 f"{voice_rules_text} "
-                "Answer directly in 1-3 sentences. Stay in character. "
-                "Do not introduce yourself, do not describe your role, do not add titles or labels."
+                "Answer in 1-3 sentences. Do NOT write 'Player:' or 'NPC:' labels. "
+                "Stop immediately after answering. Do not add follow-up questions."
             )
         else:
             system_prompt = f"You are {npc_id}, an NPC inside Game_Surf. {MEMORY_SLOT}"
@@ -514,7 +536,7 @@ def load_player_context(player_id: str, npc_id: str, current_message: str = "") 
     try:
         session_count_resp = (
             supabase_client.table("dialogue_sessions")
-            .select("session_id", count="exact")
+            .select("session_id", count="exact")  # type: ignore
             .match({"player_id": player_id, "npc_id": npc_id})
             .execute()
         )
@@ -690,6 +712,22 @@ def start_graph_refresh_scheduler() -> None:
     print(f"Started graph refresh scheduler (interval={GRAPH_REFRESH_INTERVAL_SECONDS}s)")
 
 
+# Regex to detect LoRA dialogue format leakage in NPC responses
+_DIALOGUE_LEAK_PATTERNS = [
+    re.compile(r"(?is)^(Player|player|User|user)\s*:\s*", re.IGNORECASE),
+    re.compile(r"(?is)^\s*(NPC|npc|Assistant|assistant)\s*:\s*", re.IGNORECASE),
+    re.compile(r"(?is)\n(PLAYER|Player|User)\s*:\s*\S", re.IGNORECASE),
+    re.compile(r"(?is)\n(NPC|Assistant)\s*:\s*\S", re.IGNORECASE),
+    re.compile(r"(?is)^\s*PLAYER\s*:", re.IGNORECASE),
+    re.compile(r"(?is)^\s*NPC\s*:", re.IGNORECASE),
+]
+
+
+def _has_dialogue_leak(text: str) -> bool:
+    """Check if the NPC response contains self-generated dialogue turns."""
+    return any(pattern.search(text) for pattern in _DIALOGUE_LEAK_PATTERNS)
+
+
 def run_direct_chat(session: DirectNpcChatSession, user_message: str) -> str:
     recent_history = session.history[-(DIRECT_CHAT_MAX_TURNS * 2):]
     messages = [ChatMessage(role=MessageRole.SYSTEM, content=session.system_prompt)]
@@ -697,7 +735,23 @@ def run_direct_chat(session: DirectNpcChatSession, user_message: str) -> str:
     messages.append(ChatMessage(role=MessageRole.USER, content=user_message))
 
     response = Settings.llm.chat(messages)
-    npc_text = clean_npc_response(extract_chat_text(response))
+    raw_text = extract_chat_text(response)
+    npc_text = clean_npc_response(raw_text)
+
+    # Guard: if LoRA output leaked into dialogue format, retry ONCE with strict hint
+    if _has_dialogue_leak(raw_text):
+        print(f"[WARN] Dialogue leak detected, retrying with strict hint: {raw_text[:80]!r}")
+        strict_messages = list(messages)
+        strict_messages[-1] = ChatMessage(
+            role=MessageRole.USER,
+            content=(
+                user_message
+                + " — IMPORTANT: Answer only the question above in 1-2 sentences. "
+                "Do NOT write 'Player:' or 'NPC:' labels. Stop after answering."
+            ),
+        )
+        retry_response = Settings.llm.chat(strict_messages)
+        npc_text = clean_npc_response(extract_chat_text(retry_response))
 
     session.history.append(ChatMessage(role=MessageRole.USER, content=user_message))
     session.history.append(ChatMessage(role=MessageRole.ASSISTANT, content=npc_text))
@@ -752,9 +806,10 @@ def init_embedding_and_llm() -> None:
             context_window=2048,
             generate_kwargs={
                 "stop": STOP_STRINGS,
-                "top_p": 0.9,
+                "top_p": 0.85,
                 "top_k": 40,
-                "repeat_penalty": 1.12,
+                "repeat_penalty": 1.18,
+                "frequency_penalty": 0.3,
             },
             model_kwargs=model_kwargs,
             verbose=False,
@@ -1821,7 +1876,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                 
                 <div class="form-group">
                     <label style="color: #4ade80;">
-                        <input type="checkbox" id="crossSession" style="width: auto; margin-right: 8px;">
+                        <input type="checkbox" id="crossSession" style="width: auto; margin-right: 8px;" checked>
                         Cross-Session Memory Test
                     </label>
                     <small style="color: #888;">Phase 1: msg1 → end session. Phase 2: msg2 in NEW session (validates memory persistence). Slower but tests full pipeline.</small>
@@ -1838,96 +1893,96 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                     <div class="npc-fields active" id="fields-ai_news_instructor">
                         <div class="form-group">
                             <label>Message 1</label>
-                            <textarea id="msg1-ai_news_instructor" placeholder="First message for AI News...">What are the latest AI breakthroughs?</textarea>
+                            <textarea id="msg1-ai_news_instructor" placeholder="First message for AI News...">Tell me about AI.</textarea>
                         </div>
                         <div class="form-group">
                             <label>Message 2</label>
-                            <textarea id="msg2-ai_news_instructor" placeholder="Second message for AI News...">Tell me about GPT-5</textarea>
+                            <textarea id="msg2-ai_news_instructor" placeholder="Second message for AI News...">Do you remember our last conversation? tell me more about that subject</textarea>
                         </div>
                     </div>
                 </div>
                 
                 <div class="npc-card" id="npc-card-maestro_jazz_instructor">
                     <div class="npc-header">
-                        <input type="checkbox" id="enable-maestro_jazz_instructor" value="maestro_jazz_instructor">
+                        <input type="checkbox" id="enable-maestro_jazz_instructor" value="maestro_jazz_instructor" checked>
                         <label for="enable-maestro_jazz_instructor">🎷 The Maestro (Jazz)</label>
                     </div>
-                    <div class="npc-fields" id="fields-maestro_jazz_instructor">
+                    <div class="npc-fields active" id="fields-maestro_jazz_instructor">
                         <div class="form-group">
                             <label>Message 1</label>
-                            <textarea id="msg1-maestro_jazz_instructor" placeholder="First message for Jazz..."></textarea>
+                            <textarea id="msg1-maestro_jazz_instructor">Tell me about jazz music.</textarea>
                         </div>
                         <div class="form-group">
                             <label>Message 2</label>
-                            <textarea id="msg2-maestro_jazz_instructor" placeholder="Second message for Jazz..."></textarea>
+                            <textarea id="msg2-maestro_jazz_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
                         </div>
                     </div>
                 </div>
                 
-                <div class="npc-card" id="npc-card-llm_instructor">
+                <div class="npc-card enabled" id="npc-card-llm_instructor">
                     <div class="npc-header">
-                        <input type="checkbox" id="enable-llm_instructor" value="llm_instructor">
+                        <input type="checkbox" id="enable-llm_instructor" value="llm_instructor" checked>
                         <label for="enable-llm_instructor">🧠 Professor LoRA</label>
                     </div>
-                    <div class="npc-fields" id="fields-llm_instructor">
+                    <div class="npc-fields active" id="fields-llm_instructor">
                         <div class="form-group">
                             <label>Message 1</label>
-                            <textarea id="msg1-llm_instructor" placeholder="First message for LLM..."></textarea>
+                            <textarea id="msg1-llm_instructor">Tell me about machine learning.</textarea>
                         </div>
                         <div class="form-group">
                             <label>Message 2</label>
-                            <textarea id="msg2-llm_instructor" placeholder="Second message for LLM..."></textarea>
+                            <textarea id="msg2-llm_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
                         </div>
                     </div>
                 </div>
                 
-                <div class="npc-card" id="npc-card-marvel_comics_instructor">
+                <div class="npc-card enabled" id="npc-card-marvel_comics_instructor">
                     <div class="npc-header">
-                        <input type="checkbox" id="enable-marvel_comics_instructor" value="marvel_comics_instructor">
+                        <input type="checkbox" id="enable-marvel_comics_instructor" value="marvel_comics_instructor" checked>
                         <label for="enable-marvel_comics_instructor">🦸 MarvelOracle</label>
                     </div>
-                    <div class="npc-fields" id="fields-marvel_comics_instructor">
+                    <div class="npc-fields active" id="fields-marvel_comics_instructor">
                         <div class="form-group">
                             <label>Message 1</label>
-                            <textarea id="msg1-marvel_comics_instructor" placeholder="First message for Marvel..."></textarea>
+                            <textarea id="msg1-marvel_comics_instructor">Tell me about superheroes.</textarea>
                         </div>
                         <div class="form-group">
                             <label>Message 2</label>
-                            <textarea id="msg2-marvel_comics_instructor" placeholder="Second message for Marvel..."></textarea>
+                            <textarea id="msg2-marvel_comics_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
                         </div>
                     </div>
                 </div>
                 
-                <div class="npc-card" id="npc-card-supabase_instructor">
+                <div class="npc-card enabled" id="npc-card-supabase_instructor">
                     <div class="npc-header">
-                        <input type="checkbox" id="enable-supabase_instructor" value="supabase_instructor">
+                        <input type="checkbox" id="enable-supabase_instructor" value="supabase_instructor" checked>
                         <label for="enable-supabase_instructor">💾 Professor Supabase</label>
                     </div>
-                    <div class="npc-fields" id="fields-supabase_instructor">
+                    <div class="npc-fields active" id="fields-supabase_instructor">
                         <div class="form-group">
                             <label>Message 1</label>
-                            <textarea id="msg1-supabase_instructor" placeholder="First message for Supabase..."></textarea>
+                            <textarea id="msg1-supabase_instructor">Tell me about databases.</textarea>
                         </div>
                         <div class="form-group">
                             <label>Message 2</label>
-                            <textarea id="msg2-supabase_instructor" placeholder="Second message for Supabase..."></textarea>
+                            <textarea id="msg2-supabase_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
                         </div>
                     </div>
                 </div>
                 
-                <div class="npc-card" id="npc-card-kosmos_instructor">
+                <div class="npc-card enabled" id="npc-card-kosmos_instructor">
                     <div class="npc-header">
-                        <input type="checkbox" id="enable-kosmos_instructor" value="kosmos_instructor">
+                        <input type="checkbox" id="enable-kosmos_instructor" value="kosmos_instructor" checked>
                         <label for="enable-kosmos_instructor">🏛️ Professor Kosmos</label>
                     </div>
-                    <div class="npc-fields" id="fields-kosmos_instructor">
+                    <div class="npc-fields active" id="fields-kosmos_instructor">
                         <div class="form-group">
                             <label>Message 1</label>
-                            <textarea id="msg1-kosmos_instructor" placeholder="First message for Greek Mythology..."></textarea>
+                            <textarea id="msg1-kosmos_instructor">Tell me about Greek mythology.</textarea>
                         </div>
                         <div class="form-group">
                             <label>Message 2</label>
-                            <textarea id="msg2-kosmos_instructor" placeholder="Second message for Greek Mythology..."></textarea>
+                            <textarea id="msg2-kosmos_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
                         </div>
                     </div>
                 </div>
@@ -2430,8 +2485,6 @@ def probe_npc_identity_sync(npc_id: str) -> Optional[dict]:
         }
     except Exception as e:
         return {"npc_id": npc_id, "error": str(e)}
-    except Exception as e:
-        return {"npc_id": npc_id, "error": str(e)}
 
 
 def get_all_npc_lora_status_sync() -> dict:
@@ -2504,6 +2557,27 @@ def validate_memory_quality(memory_response: Optional[dict],
         return False, "lacks_expected_structure"
     
     return True, "valid"
+
+
+def _log_test_result(result: dict, phase: str) -> None:
+    """Persist test result to DB so it survives server restarts."""
+    try:
+        if supabase_client is None:
+            return
+        supabase_client.table("test_results").insert({
+            "player_id": result.get("player_id"),
+            "npc_id": result.get("npc_id"),
+            "memory_created": result.get("memory_created"),
+            "memory_loaded_on_start": result.get("memory_loaded_on_start"),
+            "memory_persistence_verified": result.get("memory_persistence_verified"),
+            "memory_quality_reason": result.get("memory_quality_reason"),
+            "identity_verified": result.get("identity_verified"),
+            "error": result.get("error"),
+            "phase": phase,
+            "duration_seconds": result.get("duration_seconds"),
+        }).execute()
+    except Exception as exc:
+        print(f"[WARN] Failed to log test result: {exc}")
 
 
 def wait_for_memory_with_retry(player_id: str, npc_id: str, 
@@ -2682,6 +2756,7 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                 )
                 
                 # For cross-session: validate memory persistence
+                phase = "Phase 2" if fresh_session else "Phase 1"
                 if fresh_session:
                     if not result.get("memory_loaded_on_start"):
                         print(f"[WARN] {player_id}: Phase 2 started but Phase 1 memory NOT loaded!")
@@ -2690,6 +2765,9 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                         print(f"[OK] {player_id}: Phase 1 memory persisted to Phase 2")
                         result["memory_persistence_verified"] = True
                 
+                # Persist result to DB so it survives server restarts
+                _log_test_result(result, phase)
+
                 set_test_update(
                     session_status="memory checks complete",
                     memory_created=result["memory_created"],

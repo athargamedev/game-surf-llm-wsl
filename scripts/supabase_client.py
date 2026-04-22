@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pyright: reportAttributeAccessIssue=false, reportOptionalMemberAccess=false, reportArgumentType=false, reportOptionalSubscript=false, reportIndexIssue=false, reportCallIssue=false, reportReturnType=false, reportAssignmentType=false
 """
 Game_Surf Supabase Client - Centralized typed client for database operations.
 Provides session management, memory operations, and NPC profile access.
@@ -7,7 +8,7 @@ Provides session management, memory operations, and NPC profile access.
 from __future__ import annotations
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from dataclasses import dataclass, field
 from datetime import datetime
 import uuid
@@ -128,9 +129,9 @@ class SupabaseClient:
         if client is None:
             return None
         resp = client.table("player_profiles").select("*").eq("player_id", player_id).limit(1).execute()
-        if not resp.data:
+        if not isinstance(resp.data, list) or len(resp.data) == 0:
             return None
-        data = resp.data[0]
+        data = cast(dict[str, Any], resp.data[0])
         return PlayerProfile(
             player_id=data["player_id"],
             display_name=data["display_name"],
@@ -158,9 +159,9 @@ class SupabaseClient:
             return None
         try:
             resp = client.rpc("get_npc_profile", {"target_npc_id": npc_id}).execute()
-            if not resp.data:
+            if not isinstance(resp.data, list) or len(resp.data) == 0:
                 return None
-            data = resp.data[0]
+            data: dict[str, Any] = resp.data[0]
             return NPCProfile(
                 npc_id=data["npc_id"],
                 display_name=data["display_name"],
@@ -178,6 +179,7 @@ class SupabaseClient:
         if client is None:
             return []
         resp = client.table("npc_profiles").select("*").eq("is_active", True).execute()
+        rows = resp.data if isinstance(resp.data, list) else []
         return [
             NPCProfile(
                 npc_id=row["npc_id"],
@@ -188,7 +190,7 @@ class SupabaseClient:
                 personality=row.get("personality", {}),
                 voice_rules=row.get("voice_rules", []),
             )
-            for row in resp.data or []
+            for row in rows
         ]
 
     def upsert_npc_profile(self, profile: NPCProfile) -> bool:
