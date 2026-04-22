@@ -20,8 +20,20 @@ begin
     if turn_count = 0 then
         summary_text := 'No dialogue turns were recorded for this session.';
     else
+        -- Concatenate player messages and NPC responses, stripping system-prompt fragments
+        -- that the model sometimes prepends (e.g. "system: You are AI News Analyst...")
         select string_agg(
-            'Player: ' || left(player_message, 240) || E'\nNPC: ' || left(npc_response, 240),
+            'Player: ' || left(player_message, 240) || E'\nNPC: ' ||
+            left(
+                regexp_replace(
+                    regexp_replace(
+                        npc_response,
+                        E'^(system|npc):\\s*You are[^\\n]*\\n', '', 'i'
+                    ),
+                    E'^(system|npc):\\s*You are[^\\n]*', '', 'i'
+                ),
+                240
+            ),
             E'\n'
             order by created_at
         )
