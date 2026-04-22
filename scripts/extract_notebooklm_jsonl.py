@@ -1,62 +1,30 @@
 #!/usr/bin/env python3
 """Extract JSONL from NotebookLM ask --json output."""
-import sys, json, re
+import sys, json
 
-text = sys.stdin.read()
+raw = sys.stdin.read()
+
+# Extract answer field from JSON response
 try:
-    payload = json.loads(text)
-    if isinstance(payload, dict) and "answer" in payload:
-        text = payload["answer"]
+    resp = json.loads(raw)
+    if isinstance(resp, dict) and "answer" in resp:
+        text = resp["answer"]
+    else:
+        text = raw
 except (json.JSONDecodeError, ValueError):
-    pass
+    text = raw
 
-fence = re.search(r"```(?:jsonl|json)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
-if fence:
-    text = fence.group(1).strip()
-elif "Answer:" in text:
-    text = text.split("Answer:", maxsplit=1)[1]
-
+# NotebookLM returns \n-separated JSON objects in the answer
 objects = []
-current = []
-depth = 0
-in_str = False
-esc = False
-for c in text:
-    if depth == 0:
-        if c != "{":
-            continue
-        current = ["{"]
-        depth = 1
-        in_str = False
-        esc = False
+for line in text.strip().split("\n"):
+    line = line.strip()
+    if not line:
         continue
-    if c in "\r\n":
-        current.append(" ")
-        esc = False
-        continue
-    current.append(c)
-    if esc:
-        esc = False
-        continue
-    if c == "\\" and in_str:
-        esc = True
-        continue
-    if c == '"':
-        in_str = not in_str
-        continue
-    if in_str:
-        continue
-    if c == "{":
-        depth += 1
-    elif c == "}":
-        depth -= 1
-        if depth == 0:
-            try:
-                parsed = json.loads("".join(current))
-                objects.append(json.dumps(parsed))
-            except (json.JSONDecodeError, ValueError):
-                pass
-            current = []
+    try:
+        parsed = json.loads(line)
+        objects.append(json.dumps(parsed, ensure_ascii=False))
+    except (json.JSONDecodeError, ValueError):
+        pass
 
 output_file = sys.argv[1] if len(sys.argv) > 1 else None
 print(f"Found {len(objects)} JSON objects")
@@ -65,6 +33,13 @@ if objects and output_file:
         f.write("\n".join(objects) + "\n")
     print(f"Written: {output_file}")
 elif objects:
-    for obj in objects[:2]:
-        print(json.dumps(json.loads(obj), indent=2)[:300])
+    for obj in objects[:3]:
+        d = json.loads(obj)
+        msgs = d.get("messages", [])
+        user = next((m["content"][:100] for m in msgs if m.get("role") == "user"), "?")
+        asst = next((m["content"][:100] for m in msgs if m.get("role") == "assistant"), "?")
+        meta = d.get("metadata", {})
+        print(f"Role: {meta.get('npc_key')} | Type: {meta.get('task_type')}")
+        print(f"User: {user}")
+        print(f"Asst: {asst}")
         print("---")

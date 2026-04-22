@@ -9,7 +9,7 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 50,
+      "sample_count": 47,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - Professor Kosmos"
@@ -20,7 +20,7 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 25,
+      "sample_count": 50,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - The Maestro"
@@ -64,7 +64,7 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 50,
+      "sample_count": 47,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - Professor LoRA"
@@ -86,7 +86,7 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 58,
+      "sample_count": 47,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - AI News Analyst"
@@ -97,7 +97,7 @@
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
-      "sample_count": 60,
+      "sample_count": 49,
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - MarvelOracle"
