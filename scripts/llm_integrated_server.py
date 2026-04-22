@@ -2462,5 +2462,8 @@ if __name__ == "__main__":
     import uvicorn
 
     host = os.environ.get("HOST", "0.0.0.0")
+    if host in {"", "localhost", "0.0.0.0"} or not re.match(r"^[0-9.]+$", host):
+        host = "127.0.0.1"
     port = int(os.environ.get("PORT", "8000"))
+    print(f"Starting Uvicorn on http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="info")
