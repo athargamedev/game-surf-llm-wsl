@@ -70,6 +70,7 @@ EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 CHAT_HISTORY_TOKEN_LIMIT = int(os.environ.get("CHAT_HISTORY_TOKEN_LIMIT", "1500"))
 LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.35"))
 LLM_MAX_NEW_TOKENS = int(os.environ.get("LLM_MAX_NEW_TOKENS", "96"))
+LLAMA_N_GPU_LAYERS = int(os.environ.get("LLAMA_N_GPU_LAYERS", "35"))
 DIRECT_CHAT_MAX_TURNS = int(os.environ.get("DIRECT_CHAT_MAX_TURNS", "6"))
 GRAPH_REFRESH_INTERVAL_SECONDS = int(os.environ.get("GRAPH_REFRESH_INTERVAL_SECONDS", "1800"))
 MEMORY_SLOT = "[MEMORY_CONTEXT: {player_memory_summary}]"
@@ -661,7 +662,7 @@ def init_embedding_and_llm() -> None:
         return
 
     try:
-        model_kwargs = {}
+        model_kwargs = {"n_gpu_layers": LLAMA_N_GPU_LAYERS}
         if active_lora_adapter_path:
             model_kwargs["lora_path"] = active_lora_adapter_path
 
@@ -770,6 +771,22 @@ def preload_all_npc_models() -> None:
     chat_engines.clear()
     
     print(f"Preloaded {preloaded_count}/{len(npc_model_registry)} NPC models")
+
+
+def on_startup() -> None:
+    create_supabase_client()
+    global supabase_wrapper
+    supabase_wrapper = get_supabase()
+    load_npc_model_registry()
+    try:
+        init_embedding_and_llm()
+    except Exception as exc:
+        print(f"Startup model initialization error: {exc}")
+    try:
+        load_index()
+    except Exception as exc:
+        print(f"Startup index load error: {exc}")
+    start_graph_refresh_scheduler()
 
 
 @asynccontextmanager

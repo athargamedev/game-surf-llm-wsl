@@ -141,7 +141,7 @@ def start_chat_server(port: int | None = None, auto: bool = False) -> dict:
     os.environ["CHAT_SERVER_PORT"] = str(target_port)
     run_tmux([
         "new-session", "-d", "-s", "chat-server",
-        f"cd {ROOT} && python run_chat_server.py"
+        f"cd {ROOT} && CHAT_SERVER_PORT={target_port} python run_chat_server.py"
     ])
 
     time.sleep(2)
@@ -179,10 +179,9 @@ def start_llm_server(port: int | None = None, auto: bool = False) -> dict:
     if session_running("llm-server"):
         return {"status": "already_running", "session": "llm-server", "port": target_port}
 
-    os.environ["LLM_SERVER_PORT"] = str(target_port)
     run_tmux([
         "new-session", "-d", "-s", "llm-server",
-        f"cd {ROOT} && PYTHONPATH={ROOT}:$PYTHONPATH conda run -n unsloth_env python scripts/llm_integrated_server.py"
+        f"cd {ROOT} && PORT={target_port} LLM_SERVER_URL=http://127.0.0.1:{target_port} PYTHONPATH={ROOT}:$PYTHONPATH conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
     ])
 
     time.sleep(2)

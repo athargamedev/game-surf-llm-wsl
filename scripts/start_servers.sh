@@ -14,11 +14,11 @@ tmux kill-session -t llm-server 2>/dev/null || true
 
 # Start chat interface server (port 8080)
 echo "Starting chat server on port 8080..."
-tmux new-session -d -s chat-server "cd /root/Game_Surf/Tools/LLM_WSL && python run_chat_server.py"
+tmux new-session -d -s chat-server "cd /root/Game_Surf/Tools/LLM_WSL && CHAT_SERVER_PORT=8080 python run_chat_server.py"
 
 # Start LLM backend server (port 8000) - IMPORTANT: Set PYTHONPATH for imports
 echo "Starting LLM server on port 8000..."
-tmux new-session -d -s llm-server "cd /root/Game_Surf/Tools/LLM_WSL && PYTHONPATH=/root/Game_Surf/Tools/LLM_WSL:\$PYTHONPATH conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
+tmux new-session -d -s llm-server "cd /root/Game_Surf/Tools/LLM_WSL && PORT=8000 LLM_SERVER_URL=http://127.0.0.1:8000 PYTHONPATH=/root/Game_Surf/Tools/LLM_WSL:\$PYTHONPATH conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
 
 # Wait for servers to initialize (LLM needs ~40s to load)
 echo "Waiting for servers to initialize..."
@@ -28,7 +28,7 @@ sleep 5
 echo ""
 echo "=== Checking Chat Server (8080) ==="
 if curl -s --connect-timeout 2 http://127.0.0.1:8080/ >/dev/null 2>&1; then
-    echo "✓ Chat interface: http://localhost:8080/chat_interface.html"
+    echo "✓ Chat interface: http://127.0.0.1:8080/chat_interface.html"
 else
     echo "✗ Chat interface: NOT ready"
 fi
@@ -49,7 +49,7 @@ done
 
 echo ""
 echo "=== Ready ==="
-echo "Open: http://localhost:8080/chat_interface.html"
+echo "Open: http://127.0.0.1:8080/chat_interface.html"
 echo ""
 echo "Alternative commands:"
 echo "  python scripts/server_manager.py status"

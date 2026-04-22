@@ -95,4 +95,4 @@ def start_web_server(port=8080, directory=None):
 
 
 if __name__ == '__main__':
-    start_web_server(port=8080)
+    start_web_server(port=int(os.environ.get("CHAT_SERVER_PORT", "8080")))
