@@ -6,6 +6,11 @@
 -- PART 1: OPTIMIZED SESSION FUNCTIONS
 -- ==========================================
 
+-- Keep a cached turn count for Edge functions without duplicating player/NPC
+-- ownership on dialogue_turns. The canonical ownership lives on dialogue_sessions.
+ALTER TABLE dialogue_sessions
+    ADD COLUMN IF NOT EXISTS turn_count INTEGER NOT NULL DEFAULT 0;
+
 -- Fast session retrieval with turn count
 CREATE OR REPLACE FUNCTION get_or_create_session(
     p_player_id TEXT,
@@ -64,23 +69,30 @@ RETURNS BIGINT AS $$
 DECLARE
     v_turn_id BIGINT;
 BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM dialogue_sessions ds
+        WHERE ds.session_id = p_session_id
+          AND ds.player_id = p_player_id
+          AND ds.npc_id = p_npc_id
+    ) THEN
+        RAISE EXCEPTION 'Session % does not belong to player % and NPC %',
+            p_session_id, p_player_id, p_npc_id;
+    END IF;
+
     -- Insert turn
     INSERT INTO dialogue_turns (
         session_id,
-        player_id,
-        npc_id,
         player_message,
         npc_response
     ) VALUES (
         p_session_id,
-        p_player_id,
-        p_npc_id,
         p_player_message,
         p_npc_response
     )
-    RETURNING id INTO v_turn_id;
+    RETURNING turn_id INTO v_turn_id;
 
-    -- Update session turn count (fast)
+    -- Update cached session turn count for Edge history endpoints.
     UPDATE dialogue_sessions ds
     SET turn_count = (
         SELECT COUNT(*)
@@ -118,12 +130,7 @@ BEGIN
         ended_at = now()
     WHERE session_id = p_session_id;
 
-    -- Summarize dialogue
-    PERFORM summarize_dialogue_session(
-        p_session_id,
-        v_player_id,
-        v_npc_id
-    );
+    -- The dialogue_sessions trigger summarizes ended sessions.
 
     RETURN TRUE;
 END;
@@ -206,38 +213,73 @@ RETURNS INTEGER AS $$
 DECLARE
     v_count INTEGER := 0;
 BEGIN
-    -- Clear existing nodes for player
-    DELETE FROM relation_graph_nodes
-    WHERE node_id IN (
-        SELECT node_id FROM relation_graph_nodes
-        WHERE player_id = p_player_id
-    );
-
-    -- Clear existing edges
+    -- Clear existing player-specific edges first.
     DELETE FROM relation_graph_edges
-    WHERE source_node_id IN (
-        SELECT node_id FROM relation_graph_nodes
-        WHERE player_id = p_player_id
-    );
+    WHERE source_node_id = 'player:' || p_player_id
+       OR target_node_id = 'player:' || p_player_id;
 
-    -- Insert new nodes from dialogue terms
+    -- Clear the player node. Term nodes are shared across players and are kept.
+    DELETE FROM relation_graph_nodes
+    WHERE node_id = 'player:' || p_player_id;
+
     INSERT INTO relation_graph_nodes (
-        player_id,
+        node_id,
         node_type,
-        node_label,
-        term_text
+        label,
+        description,
+        metadata
+    )
+    VALUES (
+        'player:' || p_player_id,
+        'player',
+        p_player_id,
+        'Dialogue participant',
+        jsonb_build_object('player_id', p_player_id)
+    )
+    ON CONFLICT (node_id) DO UPDATE SET
+        label = EXCLUDED.label,
+        description = EXCLUDED.description,
+        metadata = EXCLUDED.metadata;
+
+    INSERT INTO relation_graph_nodes (
+        node_id,
+        node_type,
+        label,
+        description,
+        metadata
+    )
+    SELECT DISTINCT
+        'term:' || lower(regexp_replace(drt.term, '\s+', '_', 'g')),
+        'term',
+        drt.term,
+        drt.description,
+        jsonb_build_object('player_id', drt.player_id, 'term', drt.term)
+    FROM get_dialogue_relation_matches() drt
+    WHERE drt.player_id = p_player_id
+    ON CONFLICT (node_id) DO UPDATE SET
+        label = EXCLUDED.label,
+        description = EXCLUDED.description,
+        metadata = relation_graph_nodes.metadata || EXCLUDED.metadata;
+
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+
+    INSERT INTO relation_graph_edges (
+        source_node_id,
+        target_node_id,
+        edge_type,
+        weight,
+        metadata
     )
     SELECT
-        p_player_id,
-        'term',
-        LOWER(drt.term),
-        drt.term
-    FROM dialogue_relation_terms drt
+        'player:' || p_player_id,
+        'term:' || lower(regexp_replace(drt.term, '\s+', '_', 'g')),
+        'uses',
+        COUNT(*)::numeric,
+        jsonb_build_object('player_id', p_player_id, 'term', drt.term)
+    FROM get_dialogue_relation_matches() drt
     WHERE drt.player_id = p_player_id
+    GROUP BY drt.term
     ON CONFLICT DO NOTHING;
-
-    -- Count inserted
-    GET DIAGNOSTICS v_count = ROW_COUNT;
 
     RETURN v_count;
 END;
@@ -260,17 +302,22 @@ BEGIN
     LOOP
         INSERT INTO dialogue_turns (
             session_id,
-            player_id,
-            npc_id,
             player_message,
             npc_response
         ) VALUES (
             (v_turn->>'session_id')::UUID,
-            v_turn->>'player_id',
-            v_turn->>'npc_id',
             v_turn->>'player_message',
             v_turn->>'npc_response'
         );
+
+        UPDATE dialogue_sessions ds
+        SET turn_count = (
+            SELECT COUNT(*)
+            FROM dialogue_turns
+            WHERE session_id = (v_turn->>'session_id')::UUID
+        )
+        WHERE ds.session_id = (v_turn->>'session_id')::UUID;
+
         v_count := v_count + 1;
     END LOOP;
 

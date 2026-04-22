@@ -2,6 +2,8 @@
 """Server manager CLI for Game_Surf chat and LLM servers."""
 
 import argparse
+import os
+import re
 import subprocess
 import sys
 import time
@@ -11,8 +13,10 @@ from pathlib import Path
 from typing import Optional
 
 ROOT = Path("/root/Game_Surf/Tools/LLM_WSL")
-BASE_URL = "http://127.0.0.1:8000"
-CHAT_URL = "http://127.0.0.1:8080"
+BASE_PORT = int(os.environ.get("LLM_SERVER_PORT", "8000"))
+CHAT_PORT = int(os.environ.get("CHAT_SERVER_PORT", "8080"))
+BASE_URL = f"http://127.0.0.1:{BASE_PORT}"
+CHAT_URL = f"http://127.0.0.1:{CHAT_PORT}"
 
 
 def run_tmux(cmd: list[str], capture: bool = False) -> subprocess.CompletedProcess:
@@ -59,24 +63,82 @@ def wait_for_server(url: str, timeout: int = 60, step: int = 5) -> bool:
     return False
 
 
-def check_port(port: int) -> bool:
-    """Check if a port is in use."""
+def find_process_on_port(port: int) -> dict | None:
+    """Find process using a port. Returns dict with pid, cmd, or None."""
     result = subprocess.run(
         ["ss", "-tlnp"],
         capture_output=True,
         text=True,
     )
-    return f":{port}" in result.stdout
+    for line in result.stdout.splitlines():
+        if f":{port}" in line and "LISTEN" in line:
+            match = re.search(r'pid=(\d+)', line)
+            pid = int(match.group(1)) if match else None
+            if pid:
+                try:
+                    cmd_result = subprocess.run(
+                        ["ps", "-p", str(pid), "-o", "args="],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    cmd = cmd_result.stdout.strip() if cmd_result.returncode == 0 else "unknown"
+                    start_result = subprocess.run(
+                        ["ps", "-p", str(pid), "-o", "lstart="],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    started = start_result.stdout.strip() if start_result.returncode == 0 else "unknown"
+                    return {"pid": pid, "cmd": cmd, "started": started}
+                except Exception:
+                    pass
+            return {"pid": pid, "cmd": "unknown", "started": "unknown"}
+    return None
 
 
-def start_chat_server() -> dict:
+def check_port(port: int) -> dict:
+    """Check if a port is in use. Returns {'in_use': bool, 'owner': dict|None}."""
+    proc = find_process_on_port(port)
+    if proc:
+        return {"in_use": True, **proc}
+    return {"in_use": False}
+
+
+def get_next_free_port(start_port: int, max_attempts: int = 5) -> int | None:
+    """Find the first free port starting from start_port."""
+    for offset in range(max_attempts):
+        port = start_port + offset
+        if not check_port(port)["in_use"]:
+            return port
+    return None
+
+
+def start_chat_server(port: int | None = None, auto: bool = False) -> dict:
     """Start the chat interface server."""
+    target_port = port or CHAT_PORT
+    
+    # Find available port if auto mode
+    if auto:
+        target_port = get_next_free_port(CHAT_PORT) or CHAT_PORT
+    
+    port_check = check_port(target_port)
+    if port_check["in_use"]:
+        owner = port_check.get("cmd", "unknown")
+        if auto:
+            # Try next port
+            alt_port = get_next_free_port(target_port)
+            if alt_port:
+                target_port = alt_port
+                port_check = check_port(target_port)
+            else:
+                return {"status": "error", "message": f"No free port near {CHAT_PORT}"}
+        else:
+            return {"status": "error", "message": f"Port {target_port} already in use by: {owner}"}
+
+    url = f"http://127.0.0.1:{target_port}"
+    
+    # Start in tmux for management
     if session_running("chat-server"):
-        return {"status": "already_running", "session": "chat-server"}
+        return {"status": "already_running", "session": "chat-server", "port": target_port}
 
-    if check_port(8080):
-        return {"status": "error", "message": "Port 8080 already in use"}
-
+    os.environ["CHAT_SERVER_PORT"] = str(target_port)
     run_tmux([
         "new-session", "-d", "-s", "chat-server",
         f"cd {ROOT} && python run_chat_server.py"
@@ -84,21 +146,40 @@ def start_chat_server() -> dict:
 
     time.sleep(2)
 
-    if wait_for_server(f"{CHAT_URL}/", timeout=15):
-        return {"status": "started", "session": "chat-server", "url": f"{CHAT_URL}/chat_interface.html"}
+    chat_url = f"http://127.0.0.1:{target_port}"
+    if wait_for_server(f"{chat_url}/", timeout=15):
+        return {"status": "started", "session": "chat-server", "port": target_port, "url": f"{chat_url}/chat_interface.html"}
     else:
         kill_session("chat-server")
-        return {"status": "error", "message": "Server did not start in time"}
+        return {"status": "error", "message": "Server did not start in time", "port": target_port}
 
 
-def start_llm_server() -> dict:
+def start_llm_server(port: int | None = None, auto: bool = False) -> dict:
     """Start the LLM integrated server."""
+    target_port = port or BASE_PORT
+    
+    # Find available port if auto mode
+    if auto:
+        target_port = get_next_free_port(BASE_PORT) or BASE_PORT
+    
+    port_check = check_port(target_port)
+    if port_check["in_use"]:
+        owner = port_check.get("cmd", "unknown")
+        if auto:
+            alt_port = get_next_free_port(target_port)
+            if alt_port:
+                target_port = alt_port
+                port_check = check_port(target_port)
+            else:
+                return {"status": "error", "message": f"No free port near {BASE_PORT}"}
+        else:
+            return {"status": "error", "message": f"Port {target_port} already in use by: {owner}"}
+
+    # Start in tmux for management
     if session_running("llm-server"):
-        return {"status": "already_running", "session": "llm-server"}
+        return {"status": "already_running", "session": "llm-server", "port": target_port}
 
-    if check_port(8000):
-        return {"status": "error", "message": "Port 8000 already in use"}
-
+    os.environ["LLM_SERVER_PORT"] = str(target_port)
     run_tmux([
         "new-session", "-d", "-s", "llm-server",
         f"cd {ROOT} && PYTHONPATH={ROOT}:$PYTHONPATH conda run -n unsloth_env python scripts/llm_integrated_server.py"
@@ -106,10 +187,11 @@ def start_llm_server() -> dict:
 
     time.sleep(2)
 
-    if wait_for_server(f"{BASE_URL}/health", timeout=60):
-        return {"status": "started", "session": "llm-server", "url": BASE_URL}
+    base_url = f"http://127.0.0.1:{target_port}"
+    if wait_for_server(f"{base_url}/health", timeout=60):
+        return {"status": "started", "session": "llm-server", "port": target_port, "url": base_url}
     else:
-        return {"status": "error", "message": "LLM server did not start in time (may need ~40s to load model)"}
+        return {"status": "error", "message": "LLM server did not start in time (may need ~40s to load model)", "port": target_port}
 
 
 def stop_server(session: str) -> dict:
@@ -135,22 +217,42 @@ def restart_server(session: str) -> dict:
 
 
 def get_server_status() -> dict:
-    """Get status of all servers."""
+    """Get status of all servers (tmux + direct processes)."""
     status = {
-        "chat_server": {"running": False, "port": 8080},
-        "llm_server": {"running": False, "port": 8000},
+        "chat_server": {"running": False, "port": CHAT_PORT, "via": None},
+        "llm_server": {"running": False, "port": BASE_PORT, "via": None},
     }
 
+    # Check for chat server (tmux)
     if session_running("chat-server"):
         status["chat_server"]["running"] = True
+        status["chat_server"]["via"] = "tmux"
         try:
             resp = requests.get(f"{CHAT_URL}/", timeout=2)
             status["chat_server"]["healthy"] = resp.status_code == 200
         except Exception:
             status["chat_server"]["healthy"] = False
 
+    # Check for chat server (direct process on ports)
+    if not status["chat_server"]["running"]:
+        for port in range(CHAT_PORT, CHAT_PORT + 5):
+            port_check = check_port(port)
+            if port_check["in_use"]:
+                status["chat_server"]["running"] = True
+                status["chat_server"]["port"] = port
+                status["chat_server"]["via"] = "direct"
+                status["chat_server"]["owner"] = port_check.get("cmd", "unknown")
+                try:
+                    resp = requests.get(f"http://127.0.0.1:{port}/", timeout=2)
+                    status["chat_server"]["healthy"] = resp.status_code == 200
+                except Exception:
+                    status["chat_server"]["healthy"] = False
+                break
+
+    # Check for LLM server (tmux)
     if session_running("llm-server"):
         status["llm_server"]["running"] = True
+        status["llm_server"]["via"] = "tmux"
         try:
             resp = requests.get(f"{BASE_URL}/health", timeout=2)
             status["llm_server"]["healthy"] = resp.status_code == 200
@@ -165,6 +267,30 @@ def get_server_status() -> dict:
                 status["llm_server"]["npc_registry"] = data.get("npc_model_registry_size", 0)
         except Exception:
             pass
+
+    # Check for LLM server (direct process on ports)
+    if not status["llm_server"]["running"]:
+        for port in range(BASE_PORT, BASE_PORT + 5):
+            port_check = check_port(port)
+            if port_check["in_use"]:
+                status["llm_server"]["running"] = True
+                status["llm_server"]["port"] = port
+                status["llm_server"]["via"] = "direct"
+                status["llm_server"]["owner"] = port_check.get("cmd", "unknown")
+                try:
+                    resp = requests.get(f"http://127.0.0.1:{port}/health", timeout=2)
+                    status["llm_server"]["healthy"] = resp.status_code == 200
+                except Exception:
+                    status["llm_server"]["healthy"] = False
+                try:
+                    resp = requests.get(f"http://127.0.0.1:{port}/status", timeout=5)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        status["llm_server"]["model_loaded"] = data.get("model_loaded", False)
+                        status["llm_server"]["npc_registry"] = data.get("npc_model_registry_size", 0)
+                except Exception:
+                    pass
+                break
 
     return status
 
@@ -187,6 +313,22 @@ def attach_session(session: str) -> None:
     subprocess.run(["tmux", "attach-session", "-t", session])
 
 
+def kill_port(port: int) -> dict:
+    """Kill process listening on a specific port."""
+    proc = find_process_on_port(port)
+    if not proc:
+        return {"status": "not_in_use", "port": port}
+    
+    pid = proc.get("pid")
+    if pid:
+        try:
+            subprocess.run(["kill", str(pid)], check=True)
+            return {"status": "killed", "port": port, "pid": pid, "cmd": proc.get("cmd")}
+        except subprocess.CalledProcessError:
+            return {"status": "error", "message": f"Failed to kill pid {pid}"}
+    return {"status": "error", "message": "No pid found"}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Game_Surf Server Manager")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -194,6 +336,7 @@ def main():
     start_parser = subparsers.add_parser("start", help="Start all servers")
     start_parser.add_argument("--chat-only", action="store_true", help="Start only chat server")
     start_parser.add_argument("--llm-only", action="store_true", help="Start only LLM server")
+    start_parser.add_argument("--auto", action="store_true", help="Auto-find first free port (8000->8002, 8080->8082)")
     start_parser.add_argument("--wait", type=int, default=60, help="Wait timeout for LLM")
 
     stop_parser = subparsers.add_parser("stop", help="Stop all servers")
@@ -211,6 +354,12 @@ def main():
     attach_parser = subparsers.add_parser("attach", help="Attach to a server session")
     attach_parser.add_argument("--session", required=True, choices=["chat-server", "llm-server"])
 
+    check_parser = subparsers.add_parser("check", help="Check a port")
+    check_parser.add_argument("port", type=int, help="Port number to check")
+
+    kill_parser = subparsers.add_parser("kill-port", help="Kill process on a port")
+    kill_parser.add_argument("port", type=int, help="Port number to kill")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -226,12 +375,12 @@ def main():
             sys.exit(0 if result["status"] == "started" else 1)
 
         if args.llm_only:
-            result = start_llm_server()
+            result = start_llm_server(auto=args.auto)
             print(json.dumps(result, indent=2))
             sys.exit(0 if result["status"] == "started" else 1)
 
-        chat_result = start_chat_server()
-        llm_result = start_llm_server()
+        chat_result = start_chat_server(auto=args.auto)
+        llm_result = start_llm_server(auto=args.auto)
 
         print("\nChat Server:")
         print(json.dumps(chat_result, indent=2))
@@ -270,6 +419,14 @@ def main():
 
     elif args.command == "attach":
         attach_session(args.session)
+
+    elif args.command == "check":
+        result = check_port(args.port)
+        print(json.dumps(result, indent=2))
+
+    elif args.command == "kill-port":
+        result = kill_port(args.port)
+        print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

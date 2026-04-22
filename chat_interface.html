@@ -598,6 +598,8 @@
         let currentSessionId = null;
         let isLoading = false;
         let serverModels = {};
+        let latestServerStatus = null;
+        let sessionInitPromise = null;
         localStorage.setItem('game_surf_player_id', currentPlayerId);
 
         // Note: This must match what the server returns from /npc-models
@@ -622,7 +624,7 @@
             await checkServerStatus();
             // Try again after a short delay if initial check failed
             setTimeout(checkServerStatus, 1000);
-            await startNewSession();
+            addSystemMessage('Select an NPC or send a message to start a session.');
         }
 
         function setupNpcSelection() {
@@ -634,8 +636,10 @@
                     this.classList.add('active');
                     currentNpc = this.dataset.npc;
                     updateDatasetInfo();
-                    await selectNpcAdapter();
-                    await startNewSession();
+                    const adapterSelected = await selectNpcAdapter();
+                    if (adapterSelected) {
+                        await startNewSession();
+                    }
                 });
             });
         }
@@ -772,6 +776,25 @@
             }
         }
 
+        function isServerReady(status) {
+            return Boolean(status && status.model_loaded && status.index_loaded);
+        }
+
+        async function waitForServerReady(attempts = 4, delayMs = 1000) {
+            for (let attempt = 0; attempt < attempts; attempt += 1) {
+                const status = await checkServerStatus();
+                if (isServerReady(status)) {
+                    return status;
+                }
+
+                if (attempt < attempts - 1) {
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+            }
+
+            return null;
+        }
+
         async function selectNpcAdapter() {
             try {
                 const response = await fetch(`${API_BASE}/reload-model`, {
@@ -784,8 +807,10 @@
                     throw new Error(data.error || data.detail || 'Unable to select NPC adapter');
                 }
                 await checkServerStatus();
+                return true;
             } catch (error) {
                 showError(`Adapter selection failed: ${error.message}`);
+                return false;
             }
         }
 
@@ -808,6 +833,7 @@
                 }
                 
                 const data = await response.json();
+                latestServerStatus = data;
                 
                 let statusHtml = `
                     <div class="label">Server Status</div>
@@ -821,7 +847,9 @@
                 `;
                 
                 document.getElementById('statusCard').innerHTML = statusHtml;
+                return data;
             } catch (error) {
+                latestServerStatus = null;
                 console.error('Server status error:', error);
                 document.getElementById('statusCard').innerHTML = `
                     <div class="label">Server Status</div>
@@ -831,38 +859,66 @@
                         <div style="font-size: 10px; margin-top: 4px;">Retrying...</div>
                     </div>
                 `;
+                return null;
             }
         }
 
         async function startNewSession() {
-            if (currentSessionId) {
-                await endCurrentSession(false, currentNpc);
+            if (sessionInitPromise) {
+                return sessionInitPromise;
             }
-            currentSessionId = null;
+
+            sessionInitPromise = (async () => {
+                if (currentSessionId) {
+                    await endCurrentSession(false, currentNpc);
+                }
+
+                currentSessionId = null;
+                clearErrorMessage();
+
+                const status = isServerReady(latestServerStatus)
+                    ? latestServerStatus
+                    : await waitForServerReady();
+
+                if (!isServerReady(status)) {
+                    showError('Server is still loading. Please try again in a moment.');
+                    return null;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE}/session/start`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            player_id: currentPlayerId,
+                            npc_id: currentNpc,
+                            player_name: currentPlayerName || null
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.detail || 'Unable to start session');
+                    }
+
+                    currentSessionId = data.session_id;
+                    localStorage.setItem('game_surf_player_id', currentPlayerId);
+                    addSystemMessage(`Started session ${currentSessionId} for ${npcNames[currentNpc]}`);
+                    if (data.memory_summary) {
+                        addSystemMessage(`Loaded memory: ${data.memory_summary}`);
+                    }
+                    return currentSessionId;
+                } catch (error) {
+                    console.error('Error starting session:', error);
+                    showError(error.message || 'Unable to start session. Please try again.');
+                    return null;
+                }
+            })();
+
             try {
-                const response = await fetch(`${API_BASE}/session/start`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        player_id: currentPlayerId,
-                        npc_id: currentNpc,
-                        player_name: currentPlayerName || null
-                    })
-                });
-                
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Unable to start session');
-                }
-                currentSessionId = data.session_id;
-                localStorage.setItem('game_surf_player_id', currentPlayerId);
-                addSystemMessage(`Started session ${currentSessionId} for ${npcNames[currentNpc]}`);
-                if (data.memory_summary) {
-                    addSystemMessage(`Loaded memory: ${data.memory_summary}`);
-                }
-            } catch (error) {
-                console.error('Error starting session:', error);
-                showError('Unable to start session. Please try again.');
+                return await sessionInitPromise;
+            } finally {
+                sessionInitPromise = null;
             }
         }
 
@@ -896,6 +952,9 @@
             // Ensure an active session is available before sending chat
             if (!currentSessionId) {
                 await startNewSession();
+                if (!currentSessionId) {
+                    return;
+                }
             }
 
             // Add user message to chat

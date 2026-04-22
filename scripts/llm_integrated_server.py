@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import asyncio
 import json
@@ -14,7 +15,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from llama_index.core import StorageContext, SimpleDirectoryReader, Settings, VectorStoreIndex, load_index_from_storage
@@ -24,8 +25,10 @@ from llama_index.llms.llama_cpp import LlamaCPP
 from llama_index.core.memory import ChatMemoryBuffer
 from supabase import Client, create_client
 from scripts.supabase_client import SupabaseClient, get_client as get_supabase
+import requests
+from typing import Optional
 
-app = FastAPI(title="Game_Surf NPC Dialogue Integrated Server")
+BASE_URL = os.environ.get("LLM_SERVER_URL", "http://127.0.0.1:8000")
 
 # Enable CORS for browser requests from localhost
 app.add_middleware(
@@ -752,21 +755,54 @@ def get_chat_engine(player_id: str, npc_id: str):
     return engine
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    create_supabase_client()
-    global supabase_wrapper
-    supabase_wrapper = get_supabase()
+def preload_all_npc_models() -> None:
+    """Preload all trained NPC LoRA adapters at startup to avoid first-request latency."""
+    print("Preloading all NPC models...")
     load_npc_model_registry()
-    try:
-        init_embedding_and_llm()
-    except Exception as exc:
-        print(f"Startup model initialization error: {exc}")
-    try:
-        load_index()
-    except Exception as exc:
-        print(f"Startup index load error: {exc}")
-    start_graph_refresh_scheduler()
+    
+    preloaded_count = 0
+    for npc_id in npc_model_registry.keys():
+        try:
+            result = select_npc_runtime(npc_id)
+            if result.get("loaded"):
+                preloaded_count += 1
+                print(f"  ✓ Preloaded: {npc_id}")
+            else:
+                print(f"  ✗ Failed: {npc_id} - {result.get('error', 'unknown error')}")
+        except Exception as exc:
+            print(f"  ✗ Error preloading {npc_id}: {exc}")
+    
+    # Reset to base model state after preloading
+    global active_npc_id, active_lora_adapter_path
+    active_npc_id = None
+    active_lora_adapter_path = None
+    chat_engines.clear()
+    
+    print(f"Preloaded {preloaded_count}/{len(npc_model_registry)} NPC models")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan manager (modern replacement for on_event)."""
+    # Startup
+    on_startup()
+    # Start preload in background
+    threading.Thread(target=preload_all_npc_models, daemon=True).start()
+    yield
+    # Shutdown
+    print("Shutting down...")
+
+
+app = FastAPI(title="Game_Surf NPC Dialogue Integrated Server", lifespan=lifespan)
+
+# Add CORS middleware after app creation
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:8080", "http://localhost:8080", "http://127.0.0.1", "http://localhost"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -946,10 +982,22 @@ def start_session(request: StartSessionRequest) -> StartSessionResponse:
                 if active_session_resp.data:
                     old_session_id = active_session_resp.data[0].get("session_id")
             if old_session_id:
-                print(f"[MEMORY] Ending stale active session {old_session_id} for {request.player_id}/{request.npc_id}")
-                supabase_client.table("dialogue_sessions").update(
-                    {"status": "ended", "ended_at": "now()"}
-                ).eq("session_id", old_session_id).execute()
+                print(f"[MEMORY] Closing stale active session {old_session_id} for {request.player_id}/{request.npc_id}")
+                stale_turns_resp = (
+                    supabase_client.table("dialogue_turns")
+                    .select("session_id")
+                    .eq("session_id", old_session_id)
+                    .limit(1)
+                    .execute()
+                )
+                if stale_turns_resp.data:
+                    supabase_client.table("dialogue_sessions").update(
+                        {"status": "ended", "ended_at": "now()"}
+                    ).eq("session_id", old_session_id).execute()
+                else:
+                    supabase_client.table("dialogue_sessions").delete().eq(
+                        "session_id", old_session_id
+                    ).execute()
                 active_sessions.pop(session_key, None)
 
             # Create or update the player profile when a name was supplied
@@ -1464,6 +1512,814 @@ def clear_player_memory(request: ClearPlayerMemoryRequest) -> dict:
     for key in keys_to_remove:
         chat_engines.pop(key, None)
     return {"status": "cleared", "player_id": request.player_id, "removed_keys": keys_to_remove}
+
+
+HTML_TEST_PAGE = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10-Player Memory Test</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #00d4ff; margin-bottom: 20px; }
+        .card { background: #16213e; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; color: #00d4ff; font-weight: 500; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #0f3460; border-radius: 8px; background: #0f3460; color: #eee; font-size: 14px; }
+        textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #00d4ff; }
+        button { background: #00d4ff; color: #1a1a2e; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        button:hover { background: #00b8e6; transform: translateY(-1px); }
+        button:disabled { background: #555; cursor: not-allowed; }
+        button.stop { background: #e94560; }
+        button.stop:hover { background: #d63850; }
+        .progress-bar { background: #0f3460; border-radius: 8px; height: 24px; overflow: hidden; margin: 16px 0; }
+        .progress-fill { background: linear-gradient(90deg, #00d4ff, #00b8e6); height: 100%; transition: width 0.3s; width: 0%; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+        .status-item { background: #0f3460; padding: 12px; border-radius: 8px; }
+        .status-label { font-size: 12px; color: #888; }
+        .status-value { font-size: 18px; font-weight: 600; color: #00d4ff; }
+        .log { background: #0f3460; border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; font-family: 'Monaco', 'Menlo', monospace; font-size: 13px; }
+        .log-entry { padding: 4px 0; border-bottom: 1px solid #1a1a2e; }
+        .log-entry:first-child { border-top: none; }
+        .log-time { color: #888; margin-right: 8px; }
+        .log-player { color: #00d4ff; font-weight: 600; }
+        .log-message { color: #aaa; }
+        .log-response { color: #4ade80; }
+        .player-row { display: flex; align-items: center; padding: 8px; margin: 4px 0; background: #0f3460; border-radius: 6px; }
+        .player-row.current { border: 2px solid #00d4ff; }
+        .player-num { font-weight: 600; margin-right: 12px; color: #00d4ff; min-width: 30px; }
+        .player-name { flex: 1; }
+        .player-status { color: #888; }
+        .player-status.done { color: #4ade80; }
+        .player-status.error { color: #e94560; }
+        .summary { background: #0f3460; padding: 16px; border-radius: 8px; margin-top: 16px; }
+        .summary h3 { color: #00d4ff; margin-bottom: 12px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .summary-item { text-align: center; }
+        .summary-value { font-size: 24px; font-weight: 700; }
+        .summary-label { font-size: 12px; color: #888; }
+        .npc-card { background: #0f3460; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 2px solid transparent; }
+        .cross-session-note { background: #0a2a1a; border: 1px solid #2d6a4f; border-radius: 6px; padding: 10px 14px; font-size: 12px; color: #4ade80; }
+        .npc-card.enabled { border-color: #00d4ff; }
+        .npc-header { display: flex; align-items: center; margin-bottom: 12px; }
+        .npc-header input[type="checkbox"] { width: auto; margin-right: 10px; }
+        .npc-header label { margin: 0; font-size: 16px; color: #00d4ff; cursor: pointer; }
+        .npc-fields { opacity: 0.5; pointer-events: none; }
+        .npc-fields.active { opacity: 1; pointer-events: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 10-Player Memory Test</h1>
+        
+        <div class="card" id="configCard">
+            <h2 style="margin-bottom: 16px;">Configure Test</h2>
+            <form id="testForm">
+                <div class="form-group">
+                    <label>Player Name Base</label>
+                    <input type="text" id="playerName" placeholder="e.g., Player" value="TestPlayer">
+                    <small style="color: #888;">Test will create player_001, player_002, etc. for each NPC</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Players per NPC</label>
+                    <input type="number" id="numPlayers" value="3" min="1" max="20">
+                    <small style="color: #888;">Number of players to simulate for EACH enabled NPC</small>
+                </div>
+                
+                <div class="form-group">
+                    <label style="color: #4ade80;">
+                        <input type="checkbox" id="crossSession" style="width: auto; margin-right: 8px;">
+                        Cross-Session Memory Test
+                    </label>
+                    <small style="color: #888;">Phase 1: msg1 → end session. Phase 2: msg2 in NEW session (validates memory persistence). Slower but tests full pipeline.</small>
+                </div>
+                
+                <h3 style="margin: 24px 0 16px; color: #00d4ff;">NPC Configuration</h3>
+                <p style="color: #888; margin-bottom: 16px;">Enable NPCs and configure their messages. Each enabled NPC will run separately.</p>
+                
+                <div class="npc-card enabled" id="npc-card-ai_news_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-ai_news_instructor" value="ai_news_instructor" checked>
+                        <label for="enable-ai_news_instructor">🤖 AI News Analyst</label>
+                    </div>
+                    <div class="npc-fields active" id="fields-ai_news_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-ai_news_instructor" placeholder="First message for AI News...">What are the latest AI breakthroughs?</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-ai_news_instructor" placeholder="Second message for AI News...">Tell me about GPT-5</textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="npc-card" id="npc-card-maestro_jazz_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-maestro_jazz_instructor" value="maestro_jazz_instructor">
+                        <label for="enable-maestro_jazz_instructor">🎷 The Maestro (Jazz)</label>
+                    </div>
+                    <div class="npc-fields" id="fields-maestro_jazz_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-maestro_jazz_instructor" placeholder="First message for Jazz..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-maestro_jazz_instructor" placeholder="Second message for Jazz..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="npc-card" id="npc-card-llm_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-llm_instructor" value="llm_instructor">
+                        <label for="enable-llm_instructor">🧠 Professor LoRA</label>
+                    </div>
+                    <div class="npc-fields" id="fields-llm_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-llm_instructor" placeholder="First message for LLM..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-llm_instructor" placeholder="Second message for LLM..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="npc-card" id="npc-card-marvel_comics_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-marvel_comics_instructor" value="marvel_comics_instructor">
+                        <label for="enable-marvel_comics_instructor">🦸 MarvelOracle</label>
+                    </div>
+                    <div class="npc-fields" id="fields-marvel_comics_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-marvel_comics_instructor" placeholder="First message for Marvel..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-marvel_comics_instructor" placeholder="Second message for Marvel..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="npc-card" id="npc-card-supabase_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-supabase_instructor" value="supabase_instructor">
+                        <label for="enable-supabase_instructor">💾 Professor Supabase</label>
+                    </div>
+                    <div class="npc-fields" id="fields-supabase_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-supabase_instructor" placeholder="First message for Supabase..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-supabase_instructor" placeholder="Second message for Supabase..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="npc-card" id="npc-card-kosmos_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-kosmos_instructor" value="kosmos_instructor">
+                        <label for="enable-kosmos_instructor">🏛️ Professor Kosmos</label>
+                    </div>
+                    <div class="npc-fields" id="fields-kosmos_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-kosmos_instructor" placeholder="First message for Greek Mythology..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-kosmos_instructor" placeholder="Second message for Greek Mythology..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" id="startBtn">Start Test</button>
+            </form>
+        </div>
+        
+        <div class="card" id="progressCard" style="display: none;">
+            <h2>Progress</h2>
+            <div class="cross-session-note" id="crossNote" style="display: none;">Cross-Session Mode: Phase 1 complete — waiting for memory processing before Phase 2 (msg2 in NEW sessions)</div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">Current Player</div>
+                    <div class="status-value" id="currentPlayer">--</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Session Status</div>
+                    <div class="status-value" id="sessionStatus">--</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Completed</div>
+                    <div class="status-value" id="completed">0/10</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Elapsed Time</div>
+                    <div class="status-value" id="elapsedTime">0:00</div>
+                </div>
+            </div>
+            
+            <div class="log" id="log"></div>
+            
+            <button class="stop" id="stopBtn" style="margin-top: 16px;">Stop Test</button>
+        </div>
+        
+        <div class="card" id="summaryCard" style="display: none;">
+            <h2>Test Results</h2>
+            
+            <div class="summary">
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-value" id="totalPlayers">0</div>
+                        <div class="summary-label">Total Players</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="successfulPlayers">0</div>
+                        <div class="summary-label">Successful</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="failedPlayers">0</div>
+                        <div class="summary-label">Failed</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="memoriesCreated">0</div>
+                        <div class="summary-label">Memories Created</div>
+                    </div>
+                </div>
+            </div>
+            
+            <h3 style="margin: 20px 0 12px;">Player Details</h3>
+            <div id="playerDetails"></div>
+            
+            <button onclick="location.reload()" style="margin-top: 20px;">Run New Test</button>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('testForm');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        
+        let pollInterval;
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Build NPCs config
+            const npcs = [];
+            ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor'].forEach(npc => {
+                const checkbox = document.getElementById('enable-' + npc);
+                if (checkbox && checkbox.checked) {
+                    const msg1 = document.getElementById('msg1-' + npc).value;
+                    const msg2 = document.getElementById('msg2-' + npc).value;
+                    if (msg1.trim() || msg2.trim()) {
+                        npcs.push({
+                            npc_id: npc,
+                            message_1: msg1,
+                            message_2: msg2
+                        });
+                    }
+                }
+            });
+            
+            if (npcs.length === 0) {
+                alert('Please enable at least one NPC and enter messages');
+                return;
+            }
+            
+            const config = {
+                player_name: document.getElementById('playerName').value || 'TestPlayer',
+                npcs: npcs,
+                num_players: parseInt(document.getElementById('numPlayers').value) || 3,
+                cross_session: document.getElementById('crossSession').checked
+            };
+            
+            startBtn.disabled = true;
+            startBtn.textContent = 'Starting...';
+            
+            try {
+                const resp = await fetch('/api/start-test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    alert('Failed to start test: ' + (err.detail || 'Unknown error'));
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start Test';
+                    return;
+                }
+                
+                document.getElementById('configCard').style.display = 'none';
+                document.getElementById('progressCard').style.display = 'block';
+                
+                startPolling();
+            } catch (err) {
+                alert('Error: ' + err.message);
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Test';
+            }
+        });
+        
+        // NPC checkbox toggle
+        ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor'].forEach(npc => {
+            const checkbox = document.getElementById('enable-' + npc);
+            const card = document.getElementById('npc-card-' + npc);
+            const fields = document.getElementById('fields-' + npc);
+            if (checkbox && card && fields) {
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        card.classList.add('enabled');
+                        fields.classList.add('active');
+                    } else {
+                        card.classList.remove('enabled');
+                        fields.classList.remove('active');
+                    }
+                });
+            }
+        });
+        
+        stopBtn.addEventListener('click', async () => {
+            await fetch('/api/stop-test', { method: 'POST' });
+        });
+        
+        function startPolling() {
+            pollInterval = setInterval(pollStatus, 1000);
+        }
+        
+        async function pollStatus() {
+            try {
+                const resp = await fetch('/api/test-status');
+                const state = await resp.json();
+                
+                if (!state.running && state.results.length > 0) {
+                    clearInterval(pollInterval);
+                    showSummary(state);
+                    return;
+                }
+                
+                updateUI(state);
+            } catch (err) {
+                console.error('Poll error:', err);
+            }
+        }
+        
+        function updateUI(state) {
+            const results = state.results || [];
+            const total = state.total_expected || results.length;
+            const current = state.current_player || 0;
+            const last_update = state.last_update || {};
+            const phase = state.phase || 'Phase 1';
+            
+            // Show cross-session banner
+            const crossNote = document.getElementById('crossNote');
+            if (state.cross_session) {
+                crossNote.style.display = 'block';
+                crossNote.textContent = phase + ' — ' + (results.length) + '/' + total + ' done | ' +
+                    (state.current_npc || '') + ' p' + current;
+            }
+            
+            document.getElementById('progressFill').style.width = (current / total * 100) + '%';
+            document.getElementById('currentPlayer').textContent = state.current_npc ? state.current_npc + ' (' + current + ')' : '--';
+            document.getElementById('completed').textContent = results.length + '/' + total;
+            
+            if (state.start_time) {
+                const elapsed = Math.floor((Date.now() - state.start_time) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                document.getElementById('elapsedTime').textContent = mins + ':' + String(secs).padStart(2, '0');
+            }
+            
+            if (last_update.player_id) {
+                if (last_update.session_status) {
+                    document.getElementById('sessionStatus').textContent = last_update.session_status;
+                }
+                
+                const log = document.getElementById('log');
+                const entries = [
+                    '<div class="log-entry"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> ' +
+                    '<span class="log-player">' + last_update.player_id + '</span>: ' +
+                    '<span class="log-message">' + (last_update.last_message || '') + '</span></div>'
+                ];
+                
+                if (last_update.last_response) {
+                    const respText = last_update.last_response.substring(0, 100);
+                    entries.push(
+                        '<div class="log-entry"><span class="log-time">--></span> ' +
+                        '<span class="log-response">' + respText + (last_update.last_response.length > 100 ? '...' : '') + '</span></div>'
+                    );
+                }
+                
+                log.innerHTML = entries.join('') + log.innerHTML;
+            }
+        }
+        
+        function showSummary(state) {
+            document.getElementById('progressCard').style.display = 'none';
+            document.getElementById('summaryCard').style.display = 'block';
+            
+            const results = state.results || [];
+            const successful = results.filter(r => !r.error).length;
+            const failed = results.filter(r => r.error).length;
+            const memories = results.filter(r => r.memory_created).length;
+            
+            document.getElementById('totalPlayers').textContent = results.length;
+            document.getElementById('successfulPlayers').textContent = successful;
+            document.getElementById('failedPlayers').textContent = failed;
+            document.getElementById('memoriesCreated').textContent = memories;
+            
+            const details = document.getElementById('playerDetails');
+            details.innerHTML = results.map(r => 
+                '<div class="player-row ' + (r.error ? 'error' : '') + '">' +
+                    '<span class="player-num">' + r.player_id.replace('player_', '') + '</span>' +
+                    '<span class="player-name">' + r.player_name + '</span>' +
+                    '<span class="player-status ' + (r.error ? 'error' : 'done') + '">' + (r.error || (r.memory_created ? '✓ Memory' : 'Session done')) + '</span>' +
+                '</div>'
+            ).join('');
+        }
+    </script>
+</body>
+</html>
+'''
+
+import time
+
+test_state: dict = {
+    "running": False,
+    "config": None,
+    "current_player": 0,
+    "current_npc": None,
+    "total_expected": 0,
+    "results": [],
+    "start_time": None,
+    "last_update": None,
+    "phase": "normal",
+    "cross_session": False,
+}
+_test_lock = threading.Lock()
+
+
+class NpcTestConfig(BaseModel):
+    npc_id: str
+    message_1: str
+    message_2: str
+    cross_session: bool = False  # Phase 1 ends session → Phase 2 in new session (memory test)
+
+
+class TestConfig(BaseModel):
+    player_name: str
+    npcs: list[NpcTestConfig]
+    num_players: int = 3
+    cross_session: bool = False  # If True: Phase 1=msg1→end, wait; Phase 2=msg2 in NEW session (memory test)
+
+
+def check_server_health() -> bool:
+    global app
+    try:
+        for route in app.routes:
+            if hasattr(route, 'path') and route.path == '/health':
+                return True
+        return True
+    except Exception:
+        return True
+
+
+def start_session_sync(player_id: str, player_name: str, npc_id: str) -> Optional[dict]:
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/session/start",
+            json={"player_id": player_id, "player_name": player_name, "npc_id": npc_id},
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception:
+        return None
+
+
+def send_chat_sync(player_id: str, npc_id: str, message: str, session_id: str) -> Optional[dict]:
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/chat",
+            json={"player_id": player_id, "npc_id": npc_id, "message": message, "session_id": session_id},
+            timeout=60
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception:
+        return None
+
+
+def end_session_sync(session_id: str, player_id: str, npc_id: str) -> bool:
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/session/end",
+            json={"session_id": session_id, "player_id": player_id, "npc_id": npc_id},
+            timeout=10
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+def get_memory_sync(player_id: str, npc_id: str) -> Optional[dict]:
+    try:
+        resp = requests.get(f"{BASE_URL}/debug/memory/{player_id}/{npc_id}", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("memory_summary"):
+                return data
+        return None
+    except Exception:
+        return None
+
+
+def run_player_session_thread(player_idx: int, player_id: str, player_name: str, npc_id: str, messages: list[str], fresh_session: bool = False):
+    global test_state
+    
+    result = {
+        "player_id": player_id,
+        "player_name": player_name,
+        "session_id": None,
+        "npc_id": npc_id,
+        "messages_sent": messages,
+        "responses_received": [],
+        "memory_created": False,
+        "turn_count": 0,
+        "duration_seconds": 0,
+        "error": None,
+    }
+    
+    start_time = time.time()
+    
+    try:
+        session_resp = start_session_sync(player_id, player_name, npc_id)
+        if not session_resp:
+            result["error"] = "Failed to start session"
+            with _test_lock:
+                test_state["results"].append(result)
+            return
+        
+        session_id = session_resp.get("session_id")
+        result["session_id"] = session_id
+        with _test_lock:
+            test_state["last_update"] = {
+                "player_id": player_id,
+                "npc_id": npc_id,
+                "session_status": "started",
+                "last_message": f"Session {session_id[:8]}..." if session_id else "N/A",
+            }
+        
+        time.sleep(0.5)
+        
+        for i, msg in enumerate(messages):
+            if msg and msg.strip():
+                with _test_lock:
+                    test_state["last_update"] = {
+                        "player_id": player_id,
+                        "npc_id": npc_id,
+                        "session_status": f"sending message {i+1}/{len(messages)}",
+                        "last_message": msg,
+                        "last_response": None,
+                    }
+                
+                chat_resp = send_chat_sync(player_id, npc_id, msg, session_id)
+                if not chat_resp:
+                    result["error"] = f"Failed on message {i+1}"
+                    break
+                
+                npc_response = chat_resp.get("npc_response", "")
+                result["responses_received"].append(npc_response)
+                result["turn_count"] += 1
+                with _test_lock:
+                    test_state["last_update"]["last_response"] = npc_response
+
+                time.sleep(5)
+        
+        if not result["error"]:
+            with _test_lock:
+                test_state["last_update"]["session_status"] = "ending session"
+            
+            if end_session_sync(session_id, player_id, npc_id):
+                with _test_lock:
+                    test_state["last_update"]["session_status"] = "waiting for memory processing"
+                time.sleep(15)
+                
+                memory = get_memory_sync(player_id, npc_id)
+                result["memory_created"] = memory is not None
+            else:
+                result["error"] = "Failed to end session"
+        
+    except Exception as e:
+        result["error"] = str(e)
+        if not result.get("session_id"):
+            with _test_lock:
+                test_state["results"].append(result)
+            return
+    
+    result["duration_seconds"] = time.time() - start_time
+    with _test_lock:
+        test_state["results"].append(result)
+
+
+def run_full_test_thread(config: dict):
+    global test_state
+    
+    player_name_base = config.get("player_name", "Player")
+    npc_configs = config.get("npcs", [])
+    num_players = config.get("num_players", 3)
+    cross_session = config.get("cross_session", False)
+    
+    if not npc_configs:
+        test_state["running"] = False
+        return
+    
+    test_state["total_expected"] = len(npc_configs) * num_players
+    test_state["cross_session"] = cross_session
+    
+    # Cross-session: Phase 1 = msg1 for all, wait, Phase 2 = msg2 for all
+    if cross_session:
+        for phase in ["Phase 1", "Phase 2"]:
+            test_state["phase"] = phase
+            
+            for npc_idx, npc_config in enumerate(npc_configs):
+                if not test_state["running"]:
+                    break
+                
+                npc_id = npc_config["npc_id"]
+                # Phase 1 → message_1, Phase 2 → message_2
+                msg_idx = 0 if phase == "Phase 1" else 1
+                messages = [
+                    npc_config.get("message_1", ""),
+                    npc_config.get("message_2", ""),
+                ]
+                target_msg = messages[msg_idx]
+                
+                if not target_msg or not target_msg.strip():
+                    continue
+                
+                test_state["current_npc"] = npc_id
+                
+                for i in range(1, num_players + 1):
+                    if not test_state["running"]:
+                        break
+                    
+                    test_state["current_player"] = i
+                    player_id = f"{player_name_base}_{npc_id}_{str(i).zfill(3)}"
+                    player_name = f"{player_name_base} {i} ({npc_id}) [{phase}]"
+                    
+                    # Phase 2: always fresh session (cleared between phases)
+                    fresh_session = (phase == "Phase 2")
+                    
+                    thread = threading.Thread(
+                        target=run_player_session_thread,
+                        args=(i, player_id, player_name, npc_id, [target_msg], fresh_session)
+                    )
+                    thread.start()
+                    thread.join()
+                    
+                    if i < num_players and test_state["running"]:
+                        time.sleep(2)
+                
+                if npc_idx < len(npc_configs) - 1 and test_state["running"]:
+                    time.sleep(3)
+            
+            # After Phase 1: wait for memory processing before Phase 2
+            if phase == "Phase 1" and test_state["running"]:
+                with _test_lock:
+                    test_state["last_update"] = {
+                        "player_id": "---",
+                        "npc_id": "---",
+                        "session_status": "waiting for memory processing",
+                        "last_message": "Phase 1 complete — processing memories...",
+                    }
+                time.sleep(20)
+    else:
+        # Normal: msg1 + msg2 in same session per player
+        for npc_idx, npc_config in enumerate(npc_configs):
+            if not test_state["running"]:
+                break
+            
+            npc_id = npc_config["npc_id"]
+            messages = [npc_config.get("message_1", ""), npc_config.get("message_2", "")]
+            
+            test_state["current_npc"] = npc_id
+            test_state["phase"] = "normal"
+            
+            for i in range(1, num_players + 1):
+                if not test_state["running"]:
+                    break
+                
+                test_state["current_player"] = i
+                
+                player_id = f"{player_name_base}_{npc_id}_{str(i).zfill(3)}"
+                player_name = f"{player_name_base} {i} ({npc_id})"
+                
+                thread = threading.Thread(
+                    target=run_player_session_thread,
+                    args=(i, player_id, player_name, npc_id, messages)
+                )
+                thread.start()
+                thread.join()
+                
+                if i < num_players and test_state["running"]:
+                    time.sleep(2)
+            
+            if npc_idx < len(npc_configs) - 1 and test_state["running"]:
+                time.sleep(3)
+    
+    test_state["running"] = False
+    test_state["phase"] = "complete"
+
+
+@app.get("/test-10-player", response_class=HTMLResponse)
+async def serve_test_page():
+    """Serve the 10-player memory test page."""
+    return HTMLResponse(HTML_TEST_PAGE)
+
+
+@app.post("/api/start-test")
+async def api_start_test(config: TestConfig):
+    """Start the 10-player memory test."""
+    global test_state
+    
+    if test_state["running"]:
+        raise HTTPException(400, "Test already running")
+    
+    test_state = {
+        "running": True,
+        "config": config.model_dump(),
+        "current_player": 0,
+        "results": [],
+        "start_time": int(time.time() * 1000),
+        "last_update": None,
+    }
+    
+    thread = threading.Thread(target=run_full_test_thread, args=(config.model_dump(),))
+    thread.start()
+    
+    return {"status": "started", "num_players": config.num_players}
+
+
+@app.post("/api/stop-test")
+async def api_stop_test():
+    """Stop the running test."""
+    with _test_lock:
+        test_state["running"] = False
+    return {"status": "stopped"}
+
+
+@app.get("/api/test-status")
+async def api_test_status():
+    """Get current test status."""
+    with _test_lock:
+        last_update = dict(test_state.get("last_update") or {})
+        results_snapshot = [
+            {
+                "player_id": r["player_id"],
+                "player_name": r["player_name"],
+                "session_id": r["session_id"][:8] if r.get("session_id") else None,
+                "session_status": r.get("session_status", r.get("last_message", "")),
+                "turn_count": r["turn_count"],
+                "memory_created": r["memory_created"],
+                "error": r.get("error"),
+                "duration_seconds": round(r["duration_seconds"], 1),
+            }
+            for r in test_state["results"]
+        ]
+    
+    return {
+        "running": test_state["running"],
+        "config": test_state.get("config"),
+        "phase": test_state.get("phase", "normal"),
+        "cross_session": test_state.get("cross_session", False),
+        "current_player": test_state["current_player"],
+        "current_npc": test_state.get("current_npc"),
+        "total_expected": test_state.get("total_expected", 0),
+        "results": results_snapshot,
+        "start_time": test_state.get("start_time"),
+        "last_update": last_update,
+    }
 
 
 if __name__ == "__main__":

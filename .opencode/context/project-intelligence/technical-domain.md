@@ -1,4 +1,24 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 1.2 | Updated: 2026-04-20 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 1.3 | Updated: 2026-04-22 -->
+
+# Technical Domain
+
+> Document the technical foundation, architecture, and key decisions.
+
+## Quick Reference
+
+- **Purpose**: Understand how the project works technically
+- **Update When**: New features, refactoring, tech stack changes
+- **Audience**: Developers, DevOps, technical stakeholders
+
+## Primary Stack
+
+| Layer | Technology | Version | Rationale |
+|-------|-----------|---------|-----------|
+| Language | Python | 3.10+ | Required for Unsloth, transformers |
+| Framework | Unsloth | Latest | 6GB VRAM fine-tuning on RTX 3060 |
+| Database | Supabase | PostgreSQL 15 | Player memories, dialogue history |
+| Infrastructure | Local GPU | RTX 3060 | Cost-effective LLM training |
+| Key Libraries | transformers, trl, llama.cpp, datasets | Latest | Core ML stack |
 
 # Technical Domain
 
@@ -96,16 +116,40 @@ See `decisions-log.md` for full decision history with alternatives.
 
 ## Development Environment
 
-```
-# Start both servers (LLM + Chat UI)
-bash scripts/start_servers.sh
+### Server Manager (Primary)
 
-# This starts:
-# - LLM server (port 8000) with llama.cpp + LoRA adapters
-# - Chat interface (port 8080)
+```bash
+# Check status of all servers (detects tmux + direct processes)
+python scripts/server_manager.py status
 
-# Then open: http://127.0.0.1:8080/chat_interface.html
+# Auto-start on first available port (8000→8002, 8080→8082)
+python scripts/server_manager.py start --auto
+
+# Kill process on a specific port
+python scripts/server_manager.py kill-port 8000
+
+# Attach to server tmux session
+python scripts/server_manager.py attach --session llm-server
+
+# Check which process owns a port
+python scripts/server_manager.py check 8000
 ```
+
+### Server Ports
+
+| Server | Default Port | Process Type |
+|--------|------------|------------|
+| LLM server (FastAPI + llama.cpp) | 8000 | `scripts/llm_integrated_server.py` |
+| Chat UI server | 8080 | `run_chat_server.py` |
+| Supabase (local) | 16433 | Docker container |
+
+**Auto-port behavior**: When default port is busy, `server_manager.py --auto` scans forward (+0 to +4) and starts on first free port.
+
+### Opening Chat Interface
+
+1. Start servers: `python scripts/server_manager.py start --auto`
+2. Open: `http://127.0.0.1:8080/chat_interface.html`
+3. Check LLM status: `curl http://127.0.0.1:8000/status`
 
 ## Deployment
 
@@ -124,8 +168,8 @@ Monitoring: N/A (local training)
 - [ ] Understand major technical decisions and rationale
 - [ ] Know integration points and dependencies
 - [ ] Be able to set up local development environment
-- [ ] Know how to start servers (bash scripts/start_servers.sh)
-- [ ] Check server status: curl http://127.0.0.1:8000/status
+- [ ] Know how to start servers: `python scripts/server_manager.py start --auto`
+- [ ] Check server status: `python scripts/server_manager.py status`
 
 ## 📂 Codebase References
 

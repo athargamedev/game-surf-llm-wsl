@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/notes | Priority: high | Version: 1.0 | Updated: 2025-01-12 -->
+<!-- Context: project-intelligence/notes | Priority: high | Version: 1.1 | Updated: 2026-04-22 -->
 
 # Living Notes
 
@@ -61,16 +61,19 @@
 ## Insights & Lessons Learned
 
 ### What Works Well
-- [Positive pattern 1] - [Why it works]
-- [Positive pattern 2] - [Why it works]
+- **Chrome DevTools MCP fully functional** — All tools (new_page, navigate_page, take_snapshot, list_network_requests, get_network_request, fill, click, wait_for, close_page) work correctly after Chrome install + MCP config flags (`--headless`, `--isolated`, `--no-sandbox`)
+- **Chat startup fix verified** — No eager session on page load. Session only created on NPC selection or first message. Server readiness gating works.
+- **Supabase session lifecycle** — Stale sessions with 0 turns are correctly DELETED (not marked ended), preventing junk memories
 
 ### What Could Be Better
-- [Area for improvement 1] - [Why it's a problem]
-- [Area for improvement 2] - [Why it's a problem]
+- **turn_count field in dialogue_sessions** — Updates via DB trigger, which may lag after turn insert. Not a bug, but confusing during live tracing.
+- **server_manager.py detection gap** — Non-tmux processes were invisible to manager. Fixed with direct port scanning in v1.3.
 
 ### Lessons Learned
-- [Lesson 1] - [Context and implication]
-- [Lesson 2] - [Context and implication]
+- **Always scan ports before starting** — Check existing processes before `nohup &` to avoid duplicate servers. Use `server_manager.py check <port>`.
+- **Chrome DevTools recovery** — Transient timeouts recover by navigating to `about:blank`. Never restart the whole MCP.
+- **Stale session fix in llm_integrated_server.py** — Sessions with 0 dialogue_turns rows get DELETED, not UPDATEd. This was causing junk `npc_memories` rows.
+- **Supabase table is `dialogue_sessions`**, not `npc_sessions` — Query with correct table name when checking session state.
 
 ## Patterns & Conventions
 

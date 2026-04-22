@@ -50,10 +50,12 @@ async function createTurn(
     .from("dialogue_turns")
     .insert({
       session_id: sessionId,
-      player_id: playerId,
-      npc_id: npcId,
       player_message: playerMessage,
       npc_response: npcResponse,
+      raw_json: {
+        player_id: playerId,
+        npc_id: npcId,
+      },
     })
     .select()
     .single();

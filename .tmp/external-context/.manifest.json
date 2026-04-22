@@ -1,0 +1,13 @@
+{
+  "files": [
+    {
+      "library": "Chrome DevTools MCP",
+      "package": "chrome-devtools-mcp",
+      "topic": "installation-runtime-startup-and-target-session-troubleshooting",
+      "path": ".tmp/external-context/chrome-devtools-mcp/operational-guidance.md",
+      "fetched": "2026-04-22T00:00:00Z",
+      "official_docs": "https://github.com/chromedevtools/chrome-devtools-mcp",
+      "source": "Context7 API"
+    }
+  ]
+}

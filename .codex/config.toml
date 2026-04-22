@@ -1,0 +1,2 @@
+[mcp_servers.supabase]
+url = "http://172.29.235.102:16434/api/mcp"

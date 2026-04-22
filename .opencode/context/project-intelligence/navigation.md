@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: critical | Version: 1.2 | Updated: 2026-04-20 -->
+<!-- Context: project-intelligence/nav | Priority: critical | Version: 1.4 | Updated: 2026-04-22 -->
 
 # Project Intelligence
 
@@ -11,11 +11,12 @@
 ├── navigation.md              # This file - quick overview
 ├── business-domain.md         # Business context and problem statement
 ├── technical-domain.md        # Stack, architecture, technical decisions
-├── code-standards.md          # Python patterns, naming, security (NEW)
-├── supabase-patterns.md       # Database patterns, memory workflow (NEW)
+├── code-standards.md          # Python patterns, naming, security
+├── supabase-patterns.md       # Database patterns, memory workflow
 ├── business-tech-bridge.md    # How business needs map to solutions
 ├── decisions-log.md           # Major decisions with rationale
-└── living-notes.md            # Active issues, debt, open questions
+├── living-notes.md            # Active issues, debt, open questions
+└── test-workflow.md           # Test suites and 10-player stress test
 ```
 
 ## Quick Routes
@@ -26,9 +27,26 @@
 | `technical-domain.md` | Stack, architecture, integrations | **critical** |
 | `code-standards.md` | Python patterns, naming, security | **critical** |
 | `supabase-patterns.md` | Database patterns, memory workflow | high |
+| `test-workflow.md` | Test suites, 10-player stress test | **high** |
 | `business-tech-bridge.md` | Business → technical mapping | high |
 | `decisions-log.md` | Why decisions were made | medium |
 | `living-notes.md` | Active issues and open questions | medium |
+
+## Developer Commands
+
+```bash
+# Start servers (auto-finds free port)
+python scripts/server_manager.py start --auto
+
+# Check what process owns a port
+python scripts/server_manager.py check 8000
+
+# Check all servers
+python scripts/server_manager.py status
+
+# Kill process on port
+python scripts/server_manager.py kill-port 8000
+```
 
 ## Usage
 

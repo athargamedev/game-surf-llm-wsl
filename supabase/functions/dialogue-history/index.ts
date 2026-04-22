@@ -74,7 +74,7 @@ serve(async (req: Request): Promise<Response> => {
       const sessionIds = sessions.map((s) => s.session_id);
       const { data: turns, error: turnsError } = await supabase
         .from("dialogue_turns")
-        .select("id, session_id, player_message, npc_response, created_at")
+        .select("turn_id, session_id, player_message, npc_response, created_at")
         .in("session_id", sessionIds)
         .order("created_at", { ascending: true });
 
