@@ -26,6 +26,8 @@ This manifest maps ALL available OpenCode agents, subagents, skills, tools, MCP 
 
 **Purpose:** Create raw training data from knowledge sources using NotebookLM or local LLM
 
+**Canonical choice:** Prefer the NotebookLM-direct path for new NPCs when default `generate_npc_dataset.py` still depends on local LLM synthesis.
+
 ### Available agents/subagents
 
 | Agent | Role | When to delegate |
@@ -52,8 +54,13 @@ This manifest maps ALL available OpenCode agents, subagents, skills, tools, MCP 
 ### CLI commands/scripts
 
 ```bash
-# Full generation with NotebookLM
-python scripts/generate_npc_dataset.py --npc <npc_id> --target-count 150 --backend notebooklm
+# Preferred: import existing NotebookLM-direct batches
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  --npc <npc_id> \
+  --input research/<npc_id>/notebooklm_batch_*.jsonl \
+  --import \
+  --prepare
 
 # Generate with local LLM
 python scripts/generate_npc_dataset.py --npc <npc_id> --target-count 150 --backend local --llm-url http://127.0.0.1:1234
@@ -70,6 +77,13 @@ python scripts/import_notebooklm_jsonl.py --input research/<npc_id>/notebooklm_b
 # Run via pipeline orchestrator
 ./run_pipeline.sh --npc <npc_id>
 ```
+
+### Decision tips
+
+- Prefer NotebookLM-direct generation for new NPC activation work.
+- If a 50-example NotebookLM ask times out, switch to 10-example batches.
+- Accept `45+` valid unique examples for a nominal 50-example target.
+- Require literal `[MEMORY_CONTEXT: {player_memory_summary}]` in system prompts.
 
 ### Input requirements
 
@@ -156,6 +170,12 @@ python -c "import json; [json.loads(l) for l in open('datasets/processed/<npc_id
 cut -f3 datasets/processed/<npc_id>/train.jsonl | sort | uniq -c | sort -rn
 ```
 
+### Decision tips
+
+- Keep both `teaching` and `quiz` after filtering when possible.
+- Memory slot coverage should remain `1.0`.
+- Under ~500 prepared examples, plan for small-dataset training settings.
+
 ---
 
 ## Phase 3: Model Training
@@ -182,6 +202,9 @@ cut -f3 datasets/processed/<npc_id>/train.jsonl | sort | uniq -c | sort -rn
 # Standard training (2 epochs)
 python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl
 
+# Small-dataset preset (<500 samples)
+python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl --small-dataset
+
 # Custom hyperparameters
 python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
   --num-train-epochs 3 --batch-size 1 --gradient-accumulation-steps 8 \
@@ -205,6 +228,17 @@ nvidia-smi --query-gpu=memory.free,memory.total --format=csv
 # Run via pipeline orchestrator
 ./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep
 ```
+
+### Decision tips
+
+- Stop the runtime LLM server before training if VRAM is near full.
+- Small-dataset settings are appropriate when prepared splits stay under ~500 examples.
+
+### Proven example
+
+- `brazilian_history` imported to `49 valid unique`
+- Prepared splits: `45 train / 4 validation`
+- Training succeeded on `unsloth/Llama-3.2-3B-Instruct`
 
 ### Input requirements
 
@@ -296,6 +330,17 @@ python scripts/sync_runtime_artifacts.py --models exports/npc_models/<npc_id>/gg
 |------|-----------|-------|
 | `adapter_model.gguf` | `Assets/Models/NPC/<npc_id>/` | llama.cpp inference |
 | `npc_model_manifest.json` | `Assets/Models/NPC/<npc_id>/` | Model config |
+
+### Final runtime validation
+
+1. Validate `lora_adapter/` and `npc_model_manifest.json`
+2. Restart runtime with `python scripts/server_manager.py start --auto` or `python scripts/server_manager.py restart --session llm-server`
+3. Test direct chat for the new NPC
+4. Add the NPC to `/test-10-player`
+5. Run `/test-10-player`
+6. Confirm Supabase memories persist
+
+**Acceptance proof:** `/test-10-player` succeeds and Supabase memory rows are created for the NPC.
 
 ### Automation hints
 

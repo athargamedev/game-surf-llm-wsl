@@ -98,14 +98,14 @@
     },
     "lmstudio": {
       "models": {
-        "qwen3-4b-qwen3.6-plus-reasoning-distilled": {
-          "name": "qwen3.6"
+        "google/gemma-4-e4b": {
+          "name": "Gemma4-e4b (local)"
         }
       },
       "name": "LM Studio (local)",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "http://127.0.0.1:1234/v1"
+        "baseURL": "http://192.168.0.3:1234/v1"
       }
     },
     "openai": {

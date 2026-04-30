@@ -30,11 +30,11 @@
       "path": "datasets/personas/brazilian_history_instructor/brazilian_history_dataset.jsonl",
       "task_type": "mixed",
       "npc_scope": "instructor",
-      "format": "alpaca",
-      "sample_count": 200,
+      "format": "chatml",
+      "sample_count": 49,
       "weight": 1.0,
-      "source_kind": "synthetic",
-      "_note": "Professor Pedro — Brazilian history instructor"
+      "source_kind": "notebooklm_direct",
+      "_note": "Imported from NotebookLM direct JSONL - Professor Pedro"
     },
     {
       "name": "astronomy_dataset",

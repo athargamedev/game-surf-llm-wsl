@@ -32,6 +32,19 @@
 | `decisions-log.md` | Why decisions were made | medium |
 | `living-notes.md` | Active issues and open questions | medium |
 
+## Canonical New NPC Route
+
+Use this route for creating and activating a new NPC with the proven NotebookLM-direct path:
+
+1. Verify notebook + NPC profile → `technical-domain.md`
+2. Generate NotebookLM-direct JSONL batches → `technical-domain.md`, `docs/NOTEBOOKLM_DATASET_WORKFLOW.md`
+3. Import + prepare dataset → `docs/NOTEBOOKLM_DATASET_WORKFLOW.md`
+4. Train LoRA + validate manifest/artifacts → `docs/PIPELINE_REFERENCE.md`
+5. Restart runtime correctly → `technical-domain.md`
+6. Final proof via chat + `/test-10-player` + Supabase memories → `test-workflow.md`
+
+**Worked example:** `brazilian_history` → `brazilian_history_instructor`
+
 ## Developer Commands
 
 ```bash

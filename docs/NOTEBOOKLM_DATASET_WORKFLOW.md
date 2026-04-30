@@ -7,7 +7,7 @@ metadata:
 
 # NotebookLM Dataset Workflow
 
-Use this skill to automate NPC dataset creation for Game_Surf training pipeline.
+Use this workflow for the **canonical new NPC path** when `generate_npc_dataset.py` still depends on local LLM synthesis.
 
 ## Quick Start
 
@@ -18,6 +18,36 @@ cd /root/Game_Surf/Tools/LLM_WSL
 ## Core Workflow
 
 1. **Generate prompt** → 2. **Query NotebookLM** → 3. **Import to persona** → 4. **Prepare splits** → 5. **Smoke test**
+
+## Canonical Step-by-Step
+
+1. **Pick/create notebook and verify NPC profile**
+   - Confirm NotebookLM notebook matches the subject.
+   - Confirm `npc_key`, `artifact_key`, and `dataset_name` in `datasets/configs/npc_profiles.json`.
+   - Example notebook: `Brazilian History Research` for `brazilian_history`.
+
+2. **Generate NotebookLM-direct JSONL batches**
+   - Prefer NotebookLM-direct for new NPCs.
+   - If a 50-example ask times out, split into 10-example batches.
+   - Proven example: `brazilian_history` succeeded with 5 narrowed batches of 10 after a full 50-example ask timed out.
+
+3. **Import and prepare dataset**
+   - Import all batch files, then prepare splits.
+   - Accept `45+` valid unique examples for a 50-example target.
+   - Require the literal memory placeholder in every system message:
+     ```
+     [MEMORY_CONTEXT: {player_memory_summary}]
+     ```
+
+4. **Train LoRA model**
+   - Once processed splits exist, run the pipeline with `--skip-generation`.
+   - If the prepared dataset stays under ~500 examples, use small-dataset settings.
+   - Stop the runtime LLM server first if VRAM is close to full.
+
+5. **Validate runtime readiness**
+   - Check `lora_adapter/` and `npc_model_manifest.json`.
+   - Restart with `python scripts/server_manager.py start --auto` or `python scripts/server_manager.py restart --session llm-server`.
+   - Add the NPC to `/test-10-player`, then validate chat + Supabase memory creation.
 
 ---
 
@@ -60,6 +90,23 @@ conda run --no-capture-output -n unsloth_env python \
   --import \
   --prepare
 ```
+
+### Brazilian History Example (proven path)
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  --npc brazilian_history \
+  --input research/brazilian_history/notebooklm_batch_*.jsonl \
+  --import \
+  --prepare
+```
+
+Result snapshot:
+- Notebook: `Brazilian History Research`
+- Generation strategy: 5 narrowed batches of 10
+- Import: `49 valid unique`, avg quality `0.883`, memory slot rate `1.0`
+- Prepared splits: `45 train / 4 validation`
 
 ### Stricter Import And Prep Gates
 
@@ -118,6 +165,7 @@ notebooklm list
 - Heuristic import quality should average roughly `0.80+`
 - Keep both `teaching` and `quiz` represented after filtering
 - Preparation can now enforce minimum per-task coverage with `--min-task-examples`
+- Smaller 10-example NotebookLM batches are the preferred fallback when 50-example asks time out
 
 ---
 
@@ -129,6 +177,18 @@ Every system message MUST include:
 ```
 
 Leave slot literal - runtime Supabase memory will be inserted later.
+
+Do not paraphrase or rename this placeholder.
+
+## Training Hand-off
+
+```bash
+python scripts/run_full_npc_pipeline.py --npc brazilian_history --skip-generation
+```
+
+Tips:
+- Under ~500 prepared examples, use small-dataset settings.
+- If runtime inference is already holding VRAM, stop the LLM server before training.
 
 ---
 

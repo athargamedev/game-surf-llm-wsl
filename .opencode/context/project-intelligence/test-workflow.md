@@ -39,6 +39,23 @@
 
 Located at `GET /test-10-player` — embedded browser UI served by the FastAPI server itself.
 
+### New NPC Activation Validation
+
+Use this sequence after training a new NPC:
+
+1. Validate artifacts and manifest exist for `exports/npc_models/<artifact_key>/`
+2. Restart runtime with one of:
+   - `python scripts/server_manager.py start --auto`
+   - `python scripts/server_manager.py restart --session llm-server`
+3. Verify direct chat works for the new NPC
+4. Add the NPC to `/test-10-player`
+5. Run `/test-10-player` and confirm successful responses
+6. Confirm Supabase NPC memories are created after session end
+
+**Acceptance proof:** `/test-10-player` passes for the NPC **and** Supabase memory rows are populated.
+
+**Worked example:** `brazilian_history_instructor` passed final runtime validation only after being added to `/test-10-player`.
+
 ### Endpoints
 
 | Endpoint | Purpose |
@@ -174,6 +191,14 @@ python tests/test_chat_interface.py
 | `/chat` → `npc_response` | Non-empty string | LLM not generating |
 | `/metrics` → `requests_total` | ≥ 0 | Metrics not tracked |
 | 10-player test | All players session→chat→end | Chat or session flow broken |
+| New NPC activation | Chat works + memories persist | Runtime or Supabase wiring incomplete |
+
+## Final Operational Proof For New NPCs
+
+- Add the NPC to `/test-10-player` before final sign-off.
+- Use direct chat for a quick sanity check, then run `/test-10-player`.
+- Treat generated Supabase memories as the final persistence proof.
+- `brazilian_history_instructor` is the reference case: runtime answers were correct and Supabase NPC memories were created.
 
 ## Onboarding Checklist
 
@@ -181,6 +206,7 @@ python tests/test_chat_interface.py
 - [ ] Check `curl http://127.0.0.1:8000/status` — model_loaded, supabase_connected true
 - [ ] Open `http://127.0.0.1:8000/test-10-player` — UI loads
 - [ ] Start a test with 3 players / 1 NPC — verify log shows messages and responses
+- [ ] Add a newly trained NPC to `/test-10-player` before final runtime validation
 - [ ] Run `python tests/test_pipeline.py` — verify dataset/model phases
 - [ ] Run `python test_memory_workflow.py` — verify memory persists after session end
 

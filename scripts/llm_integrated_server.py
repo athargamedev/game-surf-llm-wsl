@@ -1986,6 +1986,23 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                         </div>
                     </div>
                 </div>
+
+                <div class="npc-card enabled" id="npc-card-brazilian_history_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-brazilian_history_instructor" value="brazilian_history_instructor" checked>
+                        <label for="enable-brazilian_history_instructor">🇧🇷 Professor Pedro</label>
+                    </div>
+                    <div class="npc-fields active" id="fields-brazilian_history_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-brazilian_history_instructor">Tell me about Brazilian history.</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-brazilian_history_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
+                        </div>
+                    </div>
+                </div>
                 
                 <button type="submit" id="startBtn">Start Test</button>
             </form>
@@ -2066,7 +2083,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
             
             // Build NPCs config
             const npcs = [];
-            ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor'].forEach(npc => {
+            ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor', 'brazilian_history_instructor'].forEach(npc => {
                 const checkbox = document.getElementById('enable-' + npc);
                 if (checkbox && checkbox.checked) {
                     const msg1 = document.getElementById('msg1-' + npc).value;
@@ -2123,7 +2140,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
         });
         
         // NPC checkbox toggle
-        ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor'].forEach(npc => {
+        ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor', 'brazilian_history_instructor'].forEach(npc => {
             const checkbox = document.getElementById('enable-' + npc);
             const card = document.getElementById('npc-card-' + npc);
             const fields = document.getElementById('fields-' + npc);

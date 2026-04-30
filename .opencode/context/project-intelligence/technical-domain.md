@@ -106,6 +106,66 @@ See `decisions-log.md` for full decision history with alternatives.
 | Local LLM (LM Studio) | Fallback research generation | HTTP | Outbound |
 | HuggingFace Hub | Model hub access | HTTPS | Outbound |
 
+## Canonical New NPC Workflow
+
+Prefer the **NotebookLM-direct** path for new NPC creation when `generate_npc_dataset.py` still depends on local LLM synthesis.
+
+### Step-by-step
+
+1. **Pick/create notebook and verify NPC profile**
+   - Confirm notebook scope matches the NPC subject.
+   - Confirm `npc_key`, `artifact_key`, and `dataset_name` in `datasets/configs/npc_profiles.json`.
+   - Example: NotebookLM notebook `Brazilian History Research` for `brazilian_history` → `brazilian_history_instructor`.
+
+2. **Generate NotebookLM-direct JSONL batches**
+   - Use the NotebookLM-direct workflow script.
+   - If a 50-example ask times out, switch to smaller 10-example batches.
+   - Proven case: the full 50-example ask timed out; `brazilian_history` succeeded with 5 narrowed batches of 10.
+
+3. **Import and prepare dataset**
+   - Import all batch JSONL files, deduplicate, and prepare splits.
+   - Accept `45+` valid unique examples for a 50-example target.
+   - Require literal memory slot in every system prompt:
+     ```
+     [MEMORY_CONTEXT: {player_memory_summary}]
+     ```
+   - `brazilian_history` import result: 49 valid unique, avg quality `0.883`, memory slot rate `1.0`.
+   - Prepared splits: `45 train / 4 validation`.
+
+4. **Train LoRA model**
+   - Train with `scripts/run_full_npc_pipeline.py --npc <npc_key> --skip-generation` once processed splits exist.
+   - If prepared splits stay under ~500 examples, use small-dataset training settings.
+   - If VRAM is near full, stop the runtime LLM server before training.
+   - `brazilian_history` succeeded on `unsloth/Llama-3.2-3B-Instruct` with LoRA-only artifacts.
+
+5. **Validate artifacts and manifest**
+   - Check `exports/npc_models/<artifact_key>/` for `lora_adapter/` and `npc_model_manifest.json`.
+   - Confirm manifest paths point at the prepared dataset and artifact key.
+
+6. **Restart servers properly**
+   - Preferred start: `python scripts/server_manager.py start --auto`
+   - Targeted restart: `python scripts/server_manager.py restart --session llm-server`
+
+7. **Test via chat and `/test-10-player`**
+   - Add the NPC to `/test-10-player` before final runtime validation.
+   - Validate direct chat responses first, then run `/test-10-player`.
+
+8. **Confirm Supabase memories persist**
+   - Final operational proof is: `/test-10-player` succeeds **and** Supabase NPC memories are created.
+   - `brazilian_history_instructor` passed runtime validation after being added to `/test-10-player`.
+
+### Decision Tips
+
+- Prefer NotebookLM-direct over default synthetic generation for new NPC creation.
+- Use 10-example NotebookLM batches when larger asks time out.
+- Accept `45+` valid unique examples for a 50-example target if coverage is still good.
+- Keep the memory placeholder literal: `[MEMORY_CONTEXT: {player_memory_summary}]`
+- Use small-dataset settings automatically or explicitly when under ~500 examples.
+- Stop the runtime LLM server before training if VRAM headroom is low.
+- Restart with `start --auto` or `restart --session llm-server`.
+- Add the NPC to `/test-10-player` before runtime sign-off.
+- Treat `/test-10-player` + Supabase memory creation as the final acceptance test.
+
 ## Technical Constraints
 
 | Constraint | Origin | Impact |
@@ -124,6 +184,9 @@ python scripts/server_manager.py status
 
 # Auto-start on first available port (8000→8002, 8080→8082)
 python scripts/server_manager.py start --auto
+
+# Restart just the runtime LLM server
+python scripts/server_manager.py restart --session llm-server
 
 # Kill process on a specific port
 python scripts/server_manager.py kill-port 8000
@@ -165,10 +228,12 @@ Monitoring: N/A (local training)
 - [ ] Know the primary tech stack
 - [ ] Understand the architecture pattern and why it was chosen
 - [ ] Know the key project directories and their purpose
+- [ ] Know the canonical NotebookLM-direct new-NPC workflow
 - [ ] Understand major technical decisions and rationale
 - [ ] Know integration points and dependencies
 - [ ] Be able to set up local development environment
 - [ ] Know how to start servers: `python scripts/server_manager.py start --auto`
+- [ ] Know how to restart runtime only: `python scripts/server_manager.py restart --session llm-server`
 - [ ] Check server status: `python scripts/server_manager.py status`
 
 ## 📂 Codebase References

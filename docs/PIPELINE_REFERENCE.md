@@ -37,6 +37,8 @@ All five phases are orchestrated by one entry point:
 python scripts/run_full_npc_pipeline.py --npc <npc_key> [flags]
 ```
 
+> **Preferred path for new NPCs:** use the NotebookLM-direct workflow to create/import dataset batches first, then run the pipeline with `--skip-generation`.
+
 > [!TIP]
 > **Current setup:** Native WSL2 (not Docker). See [docs/SETUP_GUIDE.md](SETUP_GUIDE.md).
 
@@ -97,9 +99,32 @@ Tools/LLM/datasets/configs/npc_profiles.json
 
 1. Add an entry to `datasets/configs/npc_profiles.json` following the existing schema.
 2. Create a research notes directory at `research/<npc_key>/` with markdown `.md` files.
-3. Run the full pipeline with `--npc <your_new_key>`.
+3. Prefer NotebookLM-direct batch generation/import.
+4. Run the full pipeline with `--npc <your_new_key> --skip-generation` once processed splits exist.
 
 The key contract resolver (`scripts/npc_pipeline_contract.py`) auto-derives all paths from the registry — **never hardcode paths in scripts**.
+
+### Canonical New NPC Workflow
+
+1. Pick/create NotebookLM notebook and verify NPC profile
+2. Generate NotebookLM-direct JSONL batches
+3. Import and prepare dataset
+4. Train LoRA model
+5. Validate artifacts and manifest
+6. Restart servers properly
+7. Test via chat and `/test-10-player`
+8. Confirm Supabase memories persist
+
+**Decision tips**
+- Prefer NotebookLM-direct when `generate_npc_dataset.py` still relies on local LLM synthesis
+- Use 10-example batches if 50-example asks time out
+- Accept `45+` valid unique for a 50-example target
+- Require literal `[MEMORY_CONTEXT: {player_memory_summary}]`
+- Use small-dataset settings when prepared splits stay under ~500 examples
+- Stop the runtime LLM server before training if VRAM is near full
+- Restart with `python scripts/server_manager.py start --auto` or `python scripts/server_manager.py restart --session llm-server`
+- Add the NPC to `/test-10-player` before final runtime validation
+- Treat `/test-10-player` + Supabase memory creation as final operational proof
 
 ---
 
@@ -289,24 +314,33 @@ python .agents/skills/npc-model-tuning/scripts/tune_model.py tune \
 ```bash
 # 1. Register the NPC in npc_profiles.json (manual step)
 
-# 2. Run validation batch (2 examples) to test pipeline integrity
-python scripts/generate_npc_dataset.py \
-  --npc <npc_key> --target-count 2 --batch-size 1 --skip-research \
-  --llm-model <loaded_model_id>
+# 2. Generate/import NotebookLM-direct batches (preferred path)
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  --npc <npc_key> \
+  --input research/<npc_key>/notebooklm_batch_*.jsonl \
+  --import \
+  --prepare
 
-# 3. If output looks correct, generate the full dataset
-python scripts/generate_npc_dataset.py \
-  --npc <npc_key> --target-count 200 --batch-size 1 --async-batch \
-  --skip-research --llm-model <loaded_model_id>
-
-# 4. Fine-tune (skipping generation since we just did it)
+# 3. Fine-tune (skipping generation because processed splits now exist)
 python scripts/run_full_npc_pipeline.py --npc <npc_key> --skip-generation
 
-# 5. Load the exported .gguf in LM Studio, then start the relay
-python scripts/llm_integrated_server.py
+# 4. Restart runtime
+python scripts/server_manager.py start --auto
 
-# 6. Play the Unity scene — your new NPC is live
+# 5. Validate in chat and /test-10-player, then confirm Supabase memories
 ```
+
+### Worked Example: `brazilian_history`
+
+- NotebookLM notebook: `Brazilian History Research`
+- 50-example ask timed out; reliable path was 5 narrowed batches of 10
+- Import result: `49 valid unique`, avg quality `0.883`, memory slot rate `1.0`
+- Prepared splits: `45 train / 4 validation`
+- Training: `unsloth/Llama-3.2-3B-Instruct`, LoRA-only artifacts
+- Final losses: train `1.875`, eval `1.936`
+- Runtime validation succeeded after adding `brazilian_history_instructor` to `/test-10-player`
+- Automated test answered correctly and populated Supabase NPC memories
 
 ---
 
@@ -334,3 +368,5 @@ python scripts/llm_integrated_server.py
 | `messages` | Must have `system`, `user`, `assistant` turns | Required by `convert_to_chatml()` |
 
 Minimum recommended dataset size for meaningful LoRA fine-tuning: **100 examples** (production: 200+).
+
+For NotebookLM-direct prototype NPCs, a smaller set can still be operational if import quality is high, memory slot coverage is `1.0`, and runtime validation passes.

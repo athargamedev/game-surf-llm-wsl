@@ -154,6 +154,75 @@ Built a self-contained browser UI at `GET /test-10-player` embedded in the FastA
 
 ---
 
+## Decision: Canonical New NPC Workflow Uses NotebookLM-Direct
+
+**Date**: 2026-04-22
+**Status**: Decided
+**Owner**: Agent (LLM_WSL session)
+
+### Context
+The default `generate_npc_dataset.py` path still depends on local LLM synthesis. For new NPC activation work, the team needed a more reliable path that could be validated end-to-end against real runtime behavior and Supabase memory persistence.
+
+### Decision
+Adopt the **NotebookLM-direct** path as the canonical workflow for creating and activating new NPCs:
+1. Pick/create notebook and verify NPC profile
+2. Generate NotebookLM-direct JSONL batches
+3. Import and prepare dataset
+4. Train LoRA model
+5. Validate artifacts and manifest
+6. Restart runtime properly
+7. Test in chat and `/test-10-player`
+8. Confirm Supabase memories persist
+
+### Rationale
+- NotebookLM-direct avoids dependence on local synthetic generation for initial dataset creation
+- Smaller 10-example batches are more reliable when NotebookLM times out on 50-example requests
+- Runtime proof matters more than offline artifact presence alone
+- `/test-10-player` plus created Supabase memories validates the full operational loop
+
+### Operational Rules
+- Prefer NotebookLM-direct when default generation still relies on local synthesis
+- If 50-example asks time out, use 10-example batches
+- Accept `45+` valid unique examples for a 50-example target
+- Require literal `[MEMORY_CONTEXT: {player_memory_summary}]`
+- Use small-dataset training settings when prepared splits stay under ~500 examples
+- Stop the runtime LLM server before training if VRAM is near full
+- Restart with `python scripts/server_manager.py start --auto` or `python scripts/server_manager.py restart --session llm-server`
+- Add the NPC to `/test-10-player` before final runtime validation
+- Treat `/test-10-player` + Supabase memory creation as the final acceptance proof
+
+### Worked Example
+- NotebookLM notebook: `Brazilian History Research`
+- `brazilian_history` full 50-example ask timed out
+- Reliable path: 5 narrowed batches of 10
+- Import result: `49 valid unique`, avg quality `0.883`, memory slot rate `1.0`
+- Prepared splits: `45 train / 4 validation`
+- Training succeeded on `unsloth/Llama-3.2-3B-Instruct` with LoRA-only artifacts
+- Final losses: train `1.875`, eval `1.936`
+- Runtime validation succeeded after adding `brazilian_history_instructor` to `/test-10-player`
+- Automated test answered correctly and populated Supabase NPC memories
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Default `generate_npc_dataset.py` path | Uses existing project flow | Still relies on local synthesis | Less reliable for canonical onboarding |
+| Single 50-example NotebookLM ask | Fast when it works | Timed out in practice | Lower reliability |
+| Artifact-only validation | Cheap | Misses runtime + memory failures | Not enough for sign-off |
+
+### Impact
+- **Positive**: New NPC onboarding now has a repeatable, proven path
+- **Positive**: Runtime validation is tied to actual memory persistence
+- **Negative**: More manual coordination is needed around NotebookLM batching and `/test-10-player` setup
+- **Risk**: Docs can drift if script behavior changes
+
+### Related
+- `docs/NOTEBOOKLM_DATASET_WORKFLOW.md`
+- `docs/PIPELINE_REFERENCE.md`
+- `technical-domain.md`
+- `test-workflow.md`
+
+---
+
 ## Deprecated Decisions
 
 Decisions that were later overturned (for historical context):
