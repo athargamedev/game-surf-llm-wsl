@@ -4,13 +4,14 @@ Setup & Verify the NPC Dataset Generation Environment
 
 Checks and installs:
   1. notebooklm-mcp-cli (for NotebookLM research)
-  2. Local LLM server connectivity (LM Studio)
+  2. WSL-local training/project prerequisites
   3. NPC profile configs
   4. Directory structure
 
 Usage:
     python setup_dataset_pipeline.py          # Full check
     python setup_dataset_pipeline.py --install # Auto-install missing deps
+    python setup_dataset_pipeline.py --check-legacy-llm # Optional legacy local generation check
 """
 
 from __future__ import annotations
@@ -78,8 +79,8 @@ def check_nlm_auth() -> bool:
         return False
 
 
-def check_local_llm(url: str = "http://127.0.0.1:1234") -> bool:
-    """Check if local LLM server is reachable."""
+def check_legacy_local_llm(url: str = "http://127.0.0.1:1234") -> bool:
+    """Check if the optional legacy local generation server is reachable."""
     try:
         req = request.Request(f"{url}/v1/models", method="GET")
         with request.urlopen(req, timeout=5) as resp:
@@ -87,15 +88,15 @@ def check_local_llm(url: str = "http://127.0.0.1:1234") -> bool:
         models = data.get("data", [])
         if models:
             model_name = models[0].get("id", "unknown")
-            print(f"  [OK] Local LLM server: {url}")
+            print(f"  [OK] Legacy local generation server: {url}")
             print(f"    Model loaded: {model_name}")
             return True
         else:
-            print(f"  [!!] Local LLM server responds but no model loaded")
+            print(f"  [!!] Legacy local generation server responds but no model loaded")
             return False
     except Exception:
-        print(f"  [X] Local LLM server: NOT RUNNING at {url}")
-        print(f"    Start LM Studio and load a model, or run llama.cpp server")
+        print(f"  [X] Legacy local generation server: NOT RUNNING at {url}")
+        print("    This is OK for the canonical NotebookLM -> WSL Unsloth workflow.")
         return False
 
 
@@ -179,7 +180,12 @@ def main() -> None:
     parser.add_argument(
         "--llm-url",
         default="http://127.0.0.1:1234",
-        help="Local LLM server URL",
+        help="Legacy optional local generation server URL",
+    )
+    parser.add_argument(
+        "--check-legacy-llm",
+        action="store_true",
+        help="Also check the optional legacy OpenAI-compatible generation server",
     )
     args = parser.parse_args()
 
@@ -208,8 +214,11 @@ def main() -> None:
     else:
         results["nlm_auth"] = False
 
-    print("\n--- Local LLM Server ---")
-    results["local_llm"] = check_local_llm(args.llm_url)
+    if args.check_legacy_llm:
+        print("\n--- Legacy Local Generation Server ---")
+        results["legacy_local_llm"] = check_legacy_local_llm(args.llm_url)
+    else:
+        results["legacy_local_llm"] = None
 
     # Summary
     print("\n" + "=" * 60)
@@ -218,22 +227,19 @@ def main() -> None:
 
     all_core_ok = results["dirs"] and results["profiles"] and results["schema"]
     nlm_ok = results["nlm_cli"] and results["nlm_auth"]
-    local_ok = results["local_llm"]
+    legacy_local_ok = results["legacy_local_llm"]
 
-    if all_core_ok and (nlm_ok or local_ok):
+    if all_core_ok and nlm_ok:
         print("[OK] Ready for dataset generation!")
-        if nlm_ok:
-            print("  Backend: NotebookLM (primary) + Local LLM (generation)")
-        elif local_ok:
-            print("  Backend: Local LLM only (NotebookLM not configured)")
+        print("  Backend: NotebookLM datasets + WSL Unsloth training")
         print("\nNext step:")
-        print("  python scripts\\generate_npc_dataset.py --npc kai_instructor --dry-run")
+        print("  conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help")
     elif all_core_ok:
-        print("⚠ Core config OK, but no research backend available")
+        print("⚠ Core config OK, but NotebookLM is not ready")
         if not nlm_ok:
             print("  -> Install nlm: uv tool install notebooklm-mcp-cli && nlm login")
-        if not local_ok:
-            print(f"  -> Start LM Studio at {args.llm_url}")
+        if legacy_local_ok:
+            print("  -> Legacy local generation is available, but it is not the canonical workflow.")
     else:
         print("[X] Missing core configuration. See errors above.")
 

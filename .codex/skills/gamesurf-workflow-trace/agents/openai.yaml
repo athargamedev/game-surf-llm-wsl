@@ -1,0 +1,6 @@
+interface:
+  display_name: "Game_Surf Workflow Trace"
+  short_description: "Track NPC dataset, training, runtime, and memory gates"
+  default_prompt: "Use $gamesurf-workflow-trace to audit one NPC workflow run and summarize the weakest stage."
+policy:
+  allow_implicit_invocation: true

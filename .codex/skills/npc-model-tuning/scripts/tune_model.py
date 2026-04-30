@@ -12,7 +12,10 @@ LLM_TOOLS_DIR = ROOT_DIR
 PROFILES_PATH = LLM_TOOLS_DIR / "datasets" / "configs" / "npc_profiles.json"
 LM_API_BASE = "http://127.0.0.1:1234/api/v1"
 
-# LM Studio REST Management
+# Legacy optional LM Studio REST management.
+# The current Game_Surf workflow does not require LM Studio; NotebookLM produces
+# datasets and Unsloth trains inside WSL. Keep these commands only for old
+# synthetic-generation experiments.
 
 def _make_lm_api_req(endpoint, method="GET", data=None):
     url = f"{LM_API_BASE}{endpoint}"
@@ -84,6 +87,8 @@ def test_connection(base_url="http://127.0.0.1:1234/v1", model_id="local-model")
         print("Error: openai package is required for test-connection. Run: pip install openai")
         sys.exit(1)
 
+    print("[LEGACY] This only tests an optional OpenAI-compatible generation server.")
+    print("[LEGACY] It is not required for the NotebookLM -> WSL Unsloth training workflow.")
     print(f"Testing generation latency on {base_url} with model '{model_id}'...")
     client = OpenAI(base_url=base_url, api_key="dummy")
     
@@ -146,11 +151,11 @@ def tune_profile(npc_key, temperature, max_tokens):
 # CLI entry
 
 def main():
-    parser = argparse.ArgumentParser(description="Automate LLM tuning, connectivity testing, and LM Studio remote management.")
+    parser = argparse.ArgumentParser(description="Tune NPC profile defaults. Legacy optional commands can test/manage an external OpenAI-compatible/LM Studio generation server.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     
     # ── NPC PIPELINE COMMANDS ──
-    test_p = subparsers.add_parser("test-connection", help="Benchmark generation latency")
+    test_p = subparsers.add_parser("test-connection", help="Legacy: benchmark optional external generation latency")
     test_p.add_argument("--url", default="http://127.0.0.1:1234/v1", help="Base URL of local inference server")
     test_p.add_argument("--model", default="local-model", help="Model identifier to test")
     
@@ -159,16 +164,16 @@ def main():
     tune_p.add_argument("--temp", type=float, help="Temperature float (e.g. 0.8)")
     tune_p.add_argument("--tokens", type=int, help="Max tokens int (e.g. 150)")
     
-    # ── LM STUDIO SERVER COMMANDS ──
-    subparsers.add_parser("lm-list", help="List currently loaded models via LM Studio REST API")
+    # ── LEGACY LM STUDIO SERVER COMMANDS ──
+    subparsers.add_parser("lm-list", help="Legacy: list currently loaded models via LM Studio REST API")
     
-    lm_load_p = subparsers.add_parser("lm-load", help="Load a model into LM Studio memory")
+    lm_load_p = subparsers.add_parser("lm-load", help="Legacy: load a model into LM Studio memory")
     lm_load_p.add_argument("model_id", help="HuggingFace ID or local identifier (e.g. ibm/granite-4-micro)")
     
-    lm_unload_p = subparsers.add_parser("lm-unload", help="Unload a model from LM Studio memory")
+    lm_unload_p = subparsers.add_parser("lm-unload", help="Legacy: unload a model from LM Studio memory")
     lm_unload_p.add_argument("model_id", help="Model identifier to unload")
     
-    lm_download_p = subparsers.add_parser("lm-download", help="Start downloading a model to LM Studio")
+    lm_download_p = subparsers.add_parser("lm-download", help="Legacy: start downloading a model to LM Studio")
     lm_download_p.add_argument("model_id", help="HuggingFace model ID (e.g. TheBloke/Llama-2-7B-GGUF)")
 
     args = parser.parse_args()

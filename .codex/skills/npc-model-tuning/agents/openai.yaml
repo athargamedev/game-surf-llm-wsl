@@ -1,7 +1,7 @@
 interface:
   display_name: "NPC Model Tuning"
-  short_description: "Tune and train local NPC LLMs in WSL"
-  default_prompt: "Use $npc-model-tuning to test the local LM Studio model, tune an NPC profile, and run the WSL training pipeline."
+  short_description: "Train and validate NPC LoRAs inside WSL"
+  default_prompt: "Use $npc-model-tuning to verify WSL CUDA readiness, train an NPC LoRA with Unsloth, and trace runtime validation."
 
 policy:
   allow_implicit_invocation: true

@@ -9,14 +9,14 @@
 
 ## 1. Architecture Overview
 
-The pipeline converts a free-text subject (e.g., _Jazz History_) into a fully quantized, fine-tuned GGUF model that powers a self-aware NPC inside the Unity surfing game. It is composed of five sequential phases:
+The pipeline converts source-backed NotebookLM dataset batches into a WSL-trained LoRA adapter that powers a Unity NPC through the integrated runtime server and Supabase memory. It is composed of five sequential phases:
 
 ```
 [Research Notes]
       │
       ▼
-Phase 1 ─ Dataset Generation      generate_npc_dataset.py
-      │      (local LLM via LM Studio)
+Phase 1 ─ Dataset Creation        NotebookLM JSONL + import_notebooklm_jsonl.py
+      │      (source-backed NotebookLM batches)
       ▼
 Phase 2 ─ Dataset Preparation     prepare_dataset.py
       │      (filter, dedup, train/val split)
@@ -25,10 +25,10 @@ Phase 3 ─ Fine-Tuning             train_surf_llama.py
       │      (Unsloth / LoRA in WSL2)
       ▼
 Phase 4 ─ Artifact Sync           sync_runtime_artifacts.py
-      │      (copy .gguf + LoRA adapter into Unity project)
+      │      (copy LoRA/runtime artifacts for Unity/server use)
       ▼
-Phase 5 ─ Quality Evaluation      quality_judge.py  /  evaluate_model.py
-               (score dataset + benchmark inference)
+Phase 5 ─ Runtime Evaluation      track_workflow_run.py / evaluate_model.py
+               (training metrics + runtime chat + Supabase memory proof)
 ```
 
 All five phases are orchestrated by one entry point:
@@ -116,7 +116,7 @@ The key contract resolver (`scripts/npc_pipeline_contract.py`) auto-derives all 
 8. Confirm Supabase memories persist
 
 **Decision tips**
-- Prefer NotebookLM-direct when `generate_npc_dataset.py` still relies on local LLM synthesis
+- Prefer NotebookLM-direct for dataset creation; local synthetic generation is a fallback only
 - Use 10-example batches if 50-example asks time out
 - Accept `45+` valid unique for a 50-example target
 - Require literal `[MEMORY_CONTEXT: {player_memory_summary}]`
@@ -154,23 +154,29 @@ python scripts/run_full_npc_pipeline.py \
 
 ---
 
-### 4.2 `generate_npc_dataset.py` — Dataset Generation (Phase 1)
+### 4.2 NotebookLM Dataset Creation — Phase 1
 
-Reads research notes from `research/<npc_key>/`, calls the local LM Studio server, and writes ChatML-formatted training examples to `datasets/personas/<artifact_key>/<dataset_name>.jsonl`.
+The canonical workflow uses NotebookLM to create source-backed JSONL batches under `research/<npc_key>/`, then imports them into `datasets/personas/<artifact_key>/<dataset_name>.jsonl`.
 
 ```bash
-python scripts/generate_npc_dataset.py \
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
-  --target-count 200 \
-  --batch-size 1 \
-  --async-batch \
-  --skip-research \            # Skip NotebookLM research step
-  --llm-model llama-3.1-8b-unsloth   # MUST match the exact model ID from LM Studio
+  --input research/maestro_jazz_instructor/notebooklm_batch_*.jsonl \
+  --import \
+  --prepare
 ```
 
-**Critical:** The `--llm-model` value must exactly match the model ID returned by:
+`scripts/generate_npc_dataset.py` still exists for legacy local/synthetic generation, but it is not the normal path for this project workflow.
+
+Trace the dataset evidence after import/prepare:
+
 ```bash
-python -c "from openai import OpenAI; c = OpenAI(base_url='http://127.0.0.1:1234/v1', api_key='dummy'); print([m.id for m in c.models.list()])"
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
+  --npc maestro_jazz_instructor \
+  --stage all \
+  --skip-live-probe
 ```
 
 **Output schema** (each JSONL line):
@@ -184,7 +190,7 @@ python -c "from openai import OpenAI; c = OpenAI(base_url='http://127.0.0.1:1234
   "metadata": {
     "npc_scope":    "instructor",
     "task_type":    "teaching",
-    "source_kind":  "synthetic",
+    "source_kind":  "notebooklm_direct",
     "quality":      0.8,
     "npc_key":      "maestro_jazz_instructor"
   }
@@ -246,19 +252,19 @@ Copies the final `.gguf` and LoRA adapter into the Unity project's `Assets/` str
 
 ---
 
-### 4.6 `quality_judge.py` — Evaluation (Phase 5)
+### 4.6 `track_workflow_run.py` — Evaluation Trace (Phase 5)
 
-Scores generated examples using the local LM Studio model as the judge. Produces a per-example quality report.
+Collects stage evidence into `reports/workflow_runs/<npc_key>/<run_id>/`, including dataset audit, training metrics, artifact checks, runtime status, and optional Supabase memory proof.
 
 ```bash
-python scripts/quality_judge.py \
-  --input datasets/personas/jazz_history_instructor/jazz_history_dataset.jsonl \
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
   --npc maestro_jazz_instructor \
-  --report \
-  --max-examples 20
+  --stage all \
+  --skip-live-probe
 ```
 
-> Requires LM Studio to be running with a model loaded. Non-fatal if the server is offline.
+Run `--stage runtime --reload-model` and `--stage memory` after the WSL runtime server is running.
 
 ---
 
@@ -267,15 +273,15 @@ python scripts/quality_judge.py \
 Full integrated relay server with Supabase memory injection (RAG). Must be running during playtesting.
 
 ```bash
-python scripts/llm_integrated_server.py
-# Default port: 8005
+conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py
+# Default port: 8000
 ```
 
 The relay:
 1. Receives a POST request from Unity with the player message + NPC key.
 2. Fetches the NPC's conversation history from Supabase.
 3. Prepends the system prompt and memory context.
-4. Forwards to LM Studio at `http://127.0.0.1:1234/v1/chat/completions`.
+4. Runs the shared base model plus the selected NPC LoRA adapter in the WSL runtime.
 5. Writes the assistant response back to Supabase and returns it to Unity.
 
 ---
@@ -288,24 +294,19 @@ The relay:
 
 ## 5. Skill Interface (Agent Automation)
 
-The `npc-model-tuning` skill at `.agents/skills/npc-model-tuning/` provides a higher-level CLI wrapper (`tune_model.py`) for model management and pipeline control:
+Use the local Codex skills under `.codex/skills/`:
 
 ```bash
-# Verify server and benchmark a specific model
-python .agents/skills/npc-model-tuning/scripts/tune_model.py test-connection --model llama-3.1-8b-unsloth
+# Dataset creation/import/prepare
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help
 
-# List all models available in LM Studio
-python .agents/skills/npc-model-tuning/scripts/tune_model.py lm-list
-
-# Load a model into LM Studio inference
-python .agents/skills/npc-model-tuning/scripts/tune_model.py lm-load <model_id>
-
-# Tune generation parameters for a persona
-python .agents/skills/npc-model-tuning/scripts/tune_model.py tune \
-  --npc maestro_jazz_instructor --temp 0.9 --tokens 500
+# Workflow trace
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py --help
 ```
 
-> **Latency warning:** If `test-connection` reports > 15s, set `--batch-size 1` and **do not** use `--async-batch`. Sequential extraction is mandatory at that latency.
+The `npc-model-tuning` skill owns WSL CUDA readiness, Unsloth training, adapter validation, runtime reload, and Supabase memory checks. It does not require LM Studio.
 
 ---
 
@@ -351,9 +352,9 @@ python scripts/server_manager.py start --auto
 | `ValueError: Unknown format for *.jsonl` | Generated data uses `chatml` format, not in `--format` choices | Fixed: `chatml` added to choices; `detect_format` now raises instead of silent `"unknown"` |
 | `UnboundLocalError: cannot access local variable 'test'` | `test` not initialized when `--test-split 0.0` | Fixed: `test = None` in else branch |
 | `ZeroDivisionError` in quality filter | All 0 examples passed quality filter | Fixed: division guarded; raises `ValueError` with actionable message |
-| LLM returns empty string | LM Studio requires exact model ID; wildcard `local-model` no longer accepted | Pass `--llm-model` with exact ID from `lm-list` |
+| NotebookLM import has zero valid records | Batch output is not strict JSONL or is missing required ChatML fields | Regenerate the batch with the NotebookLM prompt template, then run importer dry-run before writing |
 | `unrecognized arguments: --train-only` | Wrong flag; pipeline uses opt-out not opt-in | Use `--skip-generation` to skip Phase 1 |
-| `conda run` fails on training | `unsloth_env` not activated or Docker not running | Ensure `conda activate unsloth_env` and Docker daemon is up |
+| `conda run` fails on training | `unsloth_env` missing or CUDA packages are unavailable in WSL | Verify `conda info --envs`, `nvidia-smi`, and `torch.cuda.is_available()` inside `unsloth_env` |
 
 ---
 
@@ -362,7 +363,7 @@ python scripts/server_manager.py start --auto
 | Field | Expected Value | Enforcement |
 |---|---|---|
 | `quality` | `0.7` – `1.0` | `--quality-threshold 0.7` (default) |
-| `source_kind` | `"synthetic"` | Set by `generate_npc_dataset.py` automatically |
+| `source_kind` | `"notebooklm_direct"` | Set by `import_notebooklm_jsonl.py` |
 | `npc_scope` | Must be in schema choices | Validated by `prepare_dataset.py` |
 | `task_type` | Must be in schema choices | Validated by `prepare_dataset.py` |
 | `messages` | Must have `system`, `user`, `assistant` turns | Required by `convert_to_chatml()` |

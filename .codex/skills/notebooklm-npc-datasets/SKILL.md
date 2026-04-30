@@ -21,6 +21,7 @@ NotebookLM direct JSONL batches
 → dataset_registry.json update
 → prepare_dataset.py validation/dedup/splits
 → optional tiny LoRA smoke training
+→ workflow trace report for comparison
 ```
 
 ## Core Rules
@@ -39,6 +40,7 @@ NotebookLM direct JSONL batches
 - Default to LoRA-only training. Do not export per-NPC GGUF unless explicitly requested.
 - Use direct orchestrator invocation for training smoke tests; `./run_pipeline.sh` can hide CUDA in this sandbox.
 - Keep each stage file-in/file-out so future Google Colab or external MCP processing jobs can take over training/export without changing project layout.
+- After import/prepare, record the evidence with `scripts/track_workflow_run.py` so each dataset iteration can be compared with later training/runtime results.
 
 ## Bundled Helper
 
@@ -119,6 +121,17 @@ conda run --no-capture-output -n unsloth_env python \
 5. Prepare the dataset and inspect dedup output.
 6. Run a 2-step LoRA smoke test only if prepare preserves enough unique examples. Keep dataset cache disabled during prototype iteration.
 7. Keep runtime using the shared base GGUF plus Supabase memory; do not create a per-NPC GGUF by default.
+8. Write a trace snapshot for the dataset stages:
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
+  --npc maestro_jazz_instructor \
+  --stage all \
+  --skip-live-probe
+```
+
+Use `--stage notebooklm`, `--stage import`, or `--stage prepare` for narrower checks during batch repair.
 
 ## Quality Gates
 
@@ -187,5 +200,6 @@ External jobs should consume one stage and write the next stage, not invent alte
 
 - Prompt template and batch subject examples: `.codex/skills/notebooklm-npc-datasets/references/notebooklm_prompt.md`
 - Project importer: `scripts/import_notebooklm_jsonl.py`
+- Workflow trace: `scripts/track_workflow_run.py`
 - Workflow doc: `docs/NOTEBOOKLM_DATASET_WORKFLOW.md`
 - Pipeline reference: `docs/PIPELINE_REFERENCE.md`

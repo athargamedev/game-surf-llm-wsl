@@ -10,6 +10,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 ROOT = Path("/root/Game_Surf/Tools/LLM_WSL")
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.npc_pipeline_contract import resolve_npc_spec
+
 NPC_PROFILES = ROOT / "datasets" / "configs" / "npc_profiles.json"
 
 
@@ -24,7 +29,8 @@ class CheckResult:
 def load_profiles() -> dict:
     if not NPC_PROFILES.exists():
         return {}
-    return json.loads(NPC_PROFILES.read_text())
+    data = json.loads(NPC_PROFILES.read_text())
+    return data.get("profiles", data)
 
 
 def check_gpu() -> CheckResult:
@@ -82,9 +88,8 @@ def check_npc(npc_id: str) -> dict[CheckResult]:
 
     results["Profile"] = CheckResult("Profile", True, f"Found {npc_id} in profiles", "")
 
-    prof = profiles[npc_id]
-    dataset_name = prof.get("dataset_name", f"{npc_id}_dataset")
-    raw_path = ROOT / "datasets" / "personas" / npc_id / f"{dataset_name}.jsonl"
+    spec = resolve_npc_spec(npc_id)
+    raw_path = spec.raw_dataset_path
 
     if raw_path.exists():
         count = len(raw_path.read_text().strip().split("\n"))
@@ -95,7 +100,7 @@ def check_npc(npc_id: str) -> dict[CheckResult]:
             f"Run: python scripts/generate_npc_dataset.py --npc {npc_id}"
         )
 
-    processed_dir = ROOT / "datasets" / "processed" / dataset_name
+    processed_dir = spec.processed_dir
     train_file = processed_dir / "train.jsonl"
     val_file = processed_dir / "validation.jsonl"
 
@@ -113,7 +118,7 @@ def check_npc(npc_id: str) -> dict[CheckResult]:
             f"Run: python scripts/prepare_dataset.py --input {raw_path}"
         )
 
-    model_dir = ROOT / "exports" / "npc_models" / npc_id
+    model_dir = spec.output_dir
     manifest_path = model_dir / "npc_model_manifest.json"
 
     if manifest_path.exists():

@@ -7,7 +7,7 @@ metadata:
 
 # NotebookLM Dataset Workflow
 
-Use this workflow for the **canonical new NPC path** when `generate_npc_dataset.py` still depends on local LLM synthesis.
+Use this workflow for the **canonical new NPC path**. NotebookLM creates source-backed JSONL examples, the importer/prepare scripts build training splits, and WSL-native Unsloth training consumes those splits. Local LLM synthesis is a legacy fallback, not the normal workflow.
 
 ## Quick Start
 

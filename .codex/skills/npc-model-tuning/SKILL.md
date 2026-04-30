@@ -1,6 +1,6 @@
 ---
 name: "npc-model-tuning"
-description: "Use when working on the Game_Surf local LLM training workflow in WSL: manage LM Studio local models, test the OpenAI-compatible local inference server, tune NPC generation defaults, generate NPC datasets, run Unsloth fine-tuning, evaluate outputs, and sync trained artifacts."
+description: "Use when working on the Game_Surf WSL-native NPC training workflow: verify CUDA/VRAM, train LoRA adapters with Unsloth inside this WSL instance, evaluate training artifacts, reload the WSL runtime server, validate chat/Supabase memory behavior, and sync trained artifacts."
 metadata:
   short-description: "Tune and train local NPC LLMs in WSL"
 ---
@@ -13,7 +13,9 @@ Use this skill from the WSL workspace root:
 cd /root/Game_Surf/Tools/LLM_WSL
 ```
 
-This workflow manages the local LM Studio inference server, tunes NPC generation defaults, generates synthetic NPC data, runs native WSL Unsloth training, evaluates results, and syncs trained artifacts back to Unity.
+This workflow manages WSL-native Unsloth training, evaluates training artifacts, reloads the integrated WSL runtime server, validates chat/Supabase behavior, and syncs trained artifacts back to Unity.
+
+Current canonical path: NotebookLM creates source-backed JSONL datasets, `prepare_dataset.py` builds train/validation splits, and `train_surf_llama.py` trains LoRA adapters inside `unsloth_env` on this WSL instance. Do not require LM Studio for normal dataset, training, or runtime validation.
 
 Reference files to load only when needed:
 - `docs/SETUP_GUIDE.md` for native WSL environment setup.
@@ -21,8 +23,8 @@ Reference files to load only when needed:
 - `docs/ARCHITECTURE.md` for system architecture.
 
 ## When to use this skill
-- A local LM Studio model needs to be listed, loaded, unloaded, downloaded, or tested.
-- The generation pipeline is slow, timing out, or producing weak NPC dialogue.
+- A WSL Unsloth training run needs to be configured, launched, resumed, diagnosed, or compared.
+- Training artifacts, manifests, adapter paths, or runtime reload behavior need validation.
 - An NPC profile needs `temperature` or `max_response_tokens` tuned in `datasets/configs/npc_profiles.json`.
 - A dataset, training run, LoRA adapter export, optional GGUF export, or Unity runtime sync needs to run from WSL instead of Docker.
 
@@ -31,37 +33,24 @@ Reference files to load only when needed:
 - Run commands from the repository root. Paths are relative to this `LLM_WSL` directory, not `Tools/LLM`.
 - Use `./run_pipeline.sh` for full training so it runs inside `unsloth_env`.
 - Use `conda run --no-capture-output -n unsloth_env python ...` for pipeline scripts when the active shell is not already inside `unsloth_env`.
-- Before long training, verify `conda info --envs`, `nvidia-smi`, and the LM Studio connection.
+- Before long training, verify `conda info --envs`, `nvidia-smi`, prepared splits, and available VRAM in this WSL instance.
 - Keep `--batch-size 1` for validation and low-VRAM cards. Increase only after a successful small run.
 - If a script's flags may have changed, run `python <script> --help` or `conda run -n unsloth_env python <script> --help` first.
+- After training, artifact checks, runtime reloads, or memory tests, record evidence with `scripts/track_workflow_run.py` so model changes can be compared across runs.
 
-## 1. Manage LM Studio
-LM Studio should be running on Windows or WSL with the local server enabled at `http://127.0.0.1:1234`. Use the bundled helper:
+## 1. Verify WSL Training Readiness
 
-```bash
-python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-list
-
-python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-download TheBloke/Llama-2-7B-GGUF
-
-python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-load cognitivecomputations/dolphin-2.2.1-mistral-7b-gguf
-
-python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-unload cognitivecomputations/dolphin-2.2.1-mistral-7b-gguf
-```
-
-If the REST management endpoints fail with 404, LM Studio is likely exposing only the OpenAI-compatible `/v1` API. Continue with connection testing and use the LM Studio UI for load/unload.
-
-## 2. Test Local Inference
-Test the active OpenAI-compatible server before generating data:
+Check the native WSL training environment before any long run:
 
 ```bash
-conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/npc-model-tuning/scripts/tune_model.py test-connection \
-  --model <loaded_model_id>
+conda info --envs
+nvidia-smi
+conda run --no-capture-output -n unsloth_env python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no cuda')"
 ```
 
-If latency exceeds 15 seconds, use small sequential settings during dataset generation and warn the user before full runs.
+If runtime inference is already using VRAM, stop or restart the WSL runtime server before training.
 
-## 3. Tune NPC Generation Defaults
+## 2. Tune NPC Generation Defaults
 Update `datasets/configs/npc_profiles.json` through the helper instead of manual string edits:
 
 ```bash
@@ -77,32 +66,20 @@ Typical tuning:
 - Increase `max_response_tokens` when answers truncate.
 - Decrease `max_response_tokens` when answers ramble.
 
-## 4. Generate a Small Validation Dataset
-Run a minimal generation batch before any full dataset or training job:
+These defaults affect synthetic fallback generation and some runtime behavior. They are not a replacement for source-backed NotebookLM dataset quality.
+
+## 3. Validate Prepared Dataset
+
+NotebookLM dataset creation is owned by `notebooklm-npc-datasets`. Before training here, verify the prepared splits:
 
 ```bash
-conda run --no-capture-output -n unsloth_env python scripts/generate_npc_dataset.py \
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
   --npc <npc_key> \
-  --target-count 2 \
-  --batch-size 1 \
-  --skip-research \
-  --llm-model <loaded_model_id>
+  --stage prepare
 ```
 
-Inspect `datasets/personas/<artifact_key>/`. If the NPC ignores tone, slang, or rules, tune the profile and rerun the small batch.
-
-## 5. Evaluate Generated Data
-Use the judge when LM Studio is available:
-
-```bash
-conda run --no-capture-output -n unsloth_env python scripts/quality_judge.py \
-  --input datasets/personas/<artifact_key>/<dataset_name>.jsonl \
-  --npc <npc_key> \
-  --report \
-  --max-examples 20
-```
-
-## 6. Run the WSL Training Pipeline
+## 4. Run the WSL Training Pipeline
 For full native WSL training, use the wrapper:
 
 ```bash
@@ -124,7 +101,23 @@ Outputs are written under `exports/npc_models/<artifact_key>/`, including the Lo
 
 For prototype iteration, keep formatted dataset cache disabled. The orchestrator passes `--no-cache-data` to training so changed JSONL files cannot reuse stale formatted rows. Use `--cache-data` only for larger stable datasets.
 
-## 7. Runtime Playtest
+Capture the training evidence after each run:
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
+  --npc <npc_key> \
+  --stage train
+
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
+  --npc <npc_key> \
+  --stage artifact
+```
+
+Use `python scripts/training_metrics.py history <npc_key>` and `python scripts/training_metrics.py compare <npc_key>` only after the current run has been logged or traced.
+
+## 5. Runtime Playtest
 After a successful LoRA adapter export:
 1. Keep the shared base GGUF loaded by the integrated WSL server.
 2. Select the NPC adapter through `/reload-model` or the browser test interface.
@@ -141,3 +134,19 @@ conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_serve
 ```
 
 5. Playtest the NPC in the Unity Editor.
+
+Record runtime and Supabase proof from the running server:
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
+  --npc <npc_key> \
+  --stage runtime \
+  --reload-model
+
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
+  --npc <npc_key> \
+  --stage memory \
+  --player-id workflow_probe
+```

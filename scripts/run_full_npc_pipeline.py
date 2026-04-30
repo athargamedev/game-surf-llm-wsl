@@ -62,7 +62,7 @@ def update_manifest_sync_state(manifest_path: Path, synced: bool) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="End-to-end NPC local LLM pipeline orchestrator.")
+    parser = argparse.ArgumentParser(description="End-to-end NPC NotebookLM dataset and WSL Unsloth training orchestrator.")
     parser.add_argument("--npc", required=True, help="Registered NPC key (e.g., 'kai_instructor')")
     parser.add_argument("--subject", default="", help="Optional specific subject for dataset generation.")
     parser.add_argument("--target-count", type=int, default=150, help="Number of interactions to generate.")
@@ -88,8 +88,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-rate", default="2e-4", help="Learning rate.")
     parser.add_argument("--generation-backend", choices=["notebooklm", "local", "auto"], default="auto", help="Research backend for dataset generation.")
     parser.add_argument("--report-path", default=None, help="Markdown research report exported from NotebookLM Deep Research.")
-    parser.add_argument("--llm-url", default="http://127.0.0.1:1234", help="OpenAI-compatible generation server URL, only needed when generating synthetic examples.")
-    parser.add_argument("--llm-model", default="local-model", help="Generation model ID loaded in the OpenAI-compatible generation server.")
+    parser.add_argument("--llm-url", default="http://127.0.0.1:1234", help="Legacy fallback only: OpenAI-compatible generation server URL for synthetic example generation.")
+    parser.add_argument("--llm-model", default="local-model", help="Legacy fallback only: model ID loaded in the optional generation server.")
     parser.add_argument("--generation-batch-size", default="1", help="Async generation batch size.")
     parser.add_argument("--skip-research", action="store_true", help="Reuse existing research notes during generation.")
     parser.add_argument(

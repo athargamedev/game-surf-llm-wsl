@@ -8,18 +8,25 @@ Run this after each training to log metrics.
 
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.npc_pipeline_contract import resolve_npc_spec
+
 METRICS_FILE = ROOT / ".training_metrics.jsonl"
 
 
 def get_training_metrics(npc_id: str) -> Optional[dict]:
     """Extract metrics from training report."""
-    report_path = ROOT / "exports" / "npc_models" / npc_id / "checkpoints" / "training_report.json"
-    config_path = ROOT / "exports" / "npc_models" / npc_id / "run_config.json"
+    spec = resolve_npc_spec(npc_id)
+    report_path = spec.output_dir / "checkpoints" / "training_report.json"
+    config_path = spec.output_dir / "run_config.json"
     
     if not report_path.exists():
         return None
@@ -36,7 +43,9 @@ def get_training_metrics(npc_id: str) -> Optional[dict]:
     best_eval_loss = min(eval_losses, key=lambda x: x["eval_loss"])["eval_loss"] if eval_losses else None
     
     return {
-        "npc_id": npc_id,
+        "npc_id": spec.npc_key,
+        "artifact_key": spec.artifact_key,
+        "dataset_name": spec.dataset_name,
         "timestamp": datetime.now().isoformat(),
         "training": {
             "total_steps": report.get("total_steps", 0),
@@ -51,8 +60,8 @@ def get_training_metrics(npc_id: str) -> Optional[dict]:
             "lora_r": config.get("lora_r"),
         },
         "dataset": {
-            "train_samples": _count_lines(ROOT / "datasets/processed" / f"{npc_id}_dataset" / "train.jsonl"),
-            "val_samples": _count_lines(ROOT / "datasets/processed" / f"{npc_id}_dataset" / "validation.jsonl"),
+            "train_samples": _count_lines(spec.processed_dir / "train.jsonl"),
+            "val_samples": _count_lines(spec.processed_dir / "validation.jsonl"),
         }
     }
 
@@ -61,6 +70,12 @@ def _count_lines(path: Optional[Path]) -> int:
     if path and path.exists():
         return len(path.read_text().strip().split("\n"))
     return 0
+
+
+def _fmt_loss(value: object) -> str:
+    if isinstance(value, (int, float)):
+        return f"{value:.4f}"
+    return "N/A"
 
 
 def log_training(npc_id: str) -> dict:
@@ -185,8 +200,8 @@ def compare(npc_id: str) -> None:
     prev_train = previous.get("training", {})
     
     print(f"\nTraining:")
-    print(f"  Train Loss: {prev_train.get('best_train_loss', 'N/A'):.4f} → {curr_train.get('best_train_loss', 'N/A'):.4f}")
-    print(f"  Eval Loss:  {prev_train.get('best_eval_loss', 'N/A'):.4f} → {curr_train.get('best_eval_loss', 'N/A'):.4f}")
+    print(f"  Train Loss: {_fmt_loss(prev_train.get('best_train_loss'))} -> {_fmt_loss(curr_train.get('best_train_loss'))}")
+    print(f"  Eval Loss:  {_fmt_loss(prev_train.get('best_eval_loss'))} -> {_fmt_loss(curr_train.get('best_eval_loss'))}")
     
     # Dataset size
     curr_data = current.get("dataset", {})
