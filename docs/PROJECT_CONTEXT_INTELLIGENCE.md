@@ -122,7 +122,64 @@ bash scripts/start_servers.sh
 - Verified integration means the Studio SQL assistant route returns `200 OK` through LM Studio. Structured-output routes still need local-model prompt/model tuning because they can fail with unparseable object responses.
 - Full research and implementation path: `docs/LOCAL_SUPABASE_CUSTOMIZATION_RESEARCH.md`.
 
-## Solar System Run Snapshot
+## Current Project State (2026-05-01)
+
+### Verified Working
+- ✅ `notebooklm` CLI installed and working (`which notebooklm` → `/root/miniforge3/bin/notebooklm`)
+- ✅ `npc_pipeline_contract.py` imports correctly (added `scripts/` to `sys.path`)
+- ✅ All `.codex/skills/` path references updated to `.opencode/skills/` in docs
+- ✅ Legacy LM Studio code removed from `setup_dataset_pipeline.py`
+- ✅ `run_full_npc_pipeline.py` is the single entry point (all docs updated)
+- ✅ VRAM pre-flight check consolidated in orchestrator (lines 19-44)
+
+### NPC Registry (10 NPCs)
+| NPC Key | Artifact Key | Status |
+|----------|--------------|--------|
+| `maestro_jazz_instructor` | `jazz_history_instructor` | Trained |
+| `greek_mythology_instructor` | `greek_mythology_instructor` | Trained (note: NPC key is `kosmos_instructor` in profiles) |
+| `brazilian_history` | `brazilian_history_instructor` | Trained |
+| `marvel_comics_instructor` | `marvel_comics_instructor` | Trained |
+| `llm_instructor` | `llm_instructor` | Trained |
+| `movies_instructor` | `movies_instructor` | Trained |
+| `solar_system_instructor` | `solar_system_instructor` | Trained |
+| `supabase_instructor` | `supabase_instructor` | Trained |
+| `ai_news_instructor` | `ai_news_instructor` | Trained |
+| `chemistry_instructor` | `chemistry_instructor` | Trained |
+
+### Quick Reference for New Agents
+```bash
+# Single entry point for everything
+./run_pipeline.sh --npc <npc_id>
+# or
+python scripts/run_full_npc_pipeline.py --npc <npc_id>
+
+# Skip phases as needed
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep
+
+# Check environment
+python scripts/setup_dataset_pipeline.py
+
+# Verify notebooklm CLI
+notebooklm --version
+notebooklm list
+```
+
+### Files That Were Fixed (2026-05-01)
+1. `scripts/setup_dataset_pipeline.py` - `nlm` → `notebooklm`, removed legacy LM Studio
+2. `scripts/generate_npc_dataset.py` - `nlm` → `notebooklm`, renamed functions
+3. `scripts/run_full_npc_pipeline.py` - Added VRAM check, fixed imports
+4. `scripts/train_surf_llama.py` - Fixed imports, kept VRAM functions (used during training)
+5. `docs/PIPELINE_REFERENCE.md` - Updated entry points, added all 10 NPCs
+6. `docs/NOTEBOOKLM_DATASET_WORKFLOW.md` - Updated `.codex/` → `.opencode/` paths
+7. `.opencode/config/workflow/NPC_TRAINING_WORKFLOW.md` - Consolidated to single entry point
+8. `.opencode/skills/gamesurf-agent/SKILL.md` - Fixed NPC ID inconsistencies
+9. `docs/PROJECT_CONTEXT_INTELLIGENCE.md` - This file (updated with improvements)
+
+### Remaining Work (For Future Sessions)
+- 🟡 Migrate `notebooklm-npc-datasets` skill from `.codex/skills/` to `.opencode/skills/`
+- 🟡 Remove `research_via_local()` function from `generate_npc_dataset.py`
+- 🔵 Remove `.codex/` directory after migration
+- 🔵 Update `AGENTS.md` with all changes
 
 - NPC: `solar_system_instructor`
 - Display: `Professor Sol`
