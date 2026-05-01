@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -23,6 +24,48 @@ from scripts.npc_pipeline_contract import resolve_npc_spec, spec_to_dict
 from scripts.training_metrics import get_training_metrics
 
 STAGES = ("prereq", "notebooklm", "import", "prepare", "train", "artifact", "runtime", "memory")
+
+MEMORY_DENIAL_PATTERNS = (
+    "no memory",
+    "do not remember",
+    "don't remember",
+    "cannot remember",
+    "can't remember",
+    "no record",
+    "no saved",
+    "i don't have",
+    "i do not have",
+    "past session",
+)
+
+MEMORY_STOPWORDS = {
+    "about",
+    "again",
+    "because",
+    "before",
+    "conversation",
+    "current",
+    "explain",
+    "from",
+    "have",
+    "last",
+    "lesson",
+    "memory",
+    "more",
+    "that",
+    "their",
+    "there",
+    "these",
+    "thing",
+    "this",
+    "what",
+    "when",
+    "where",
+    "which",
+    "with",
+    "would",
+    "your",
+}
 
 
 def now_iso() -> str:
@@ -127,6 +170,62 @@ def http_json(method: str, url: str, payload: dict[str, Any] | None = None, time
             "duration_seconds": round(time.time() - started, 3),
             "body": str(exc),
         }
+
+
+def response_uses_memory(memory_context: str, recall_message: str, response: str) -> tuple[bool, str]:
+    """Heuristic evidence that a recall answer used loaded memory."""
+    memory_text = (memory_context or "").strip()
+    response_text = (response or "").strip()
+    if not memory_text:
+        return False, "no_memory_context_loaded"
+    if not response_text:
+        return False, "empty_response"
+
+    response_lower = response_text.lower()
+    if any(pattern in response_lower for pattern in MEMORY_DENIAL_PATTERNS):
+        return False, "response_denies_memory"
+
+    memory_terms = {
+        term
+        for term in re.findall(r"[A-Za-z][A-Za-z0-9_-]{3,}", memory_text.lower())
+        if term not in MEMORY_STOPWORDS
+    }
+    recall_terms = {
+        term
+        for term in re.findall(r"[A-Za-z][A-Za-z0-9_-]{3,}", recall_message.lower())
+        if term not in MEMORY_STOPWORDS
+    }
+    response_terms = set(re.findall(r"[A-Za-z][A-Za-z0-9_-]{3,}", response_lower))
+    matched_memory_terms = sorted((memory_terms - recall_terms) & response_terms)
+    if len(matched_memory_terms) >= 2:
+        return True, f"matched_memory_terms:{','.join(matched_memory_terms[:8])}"
+    if "remember" in response_lower and matched_memory_terms:
+        return True, f"explicit_recall_with_term:{matched_memory_terms[0]}"
+    return False, "no_specific_memory_overlap"
+
+
+def _body_dict(result: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(result, dict):
+        return {}
+    body = result.get("body")
+    return body if isinstance(body, dict) else {}
+
+
+def _extract_memory_context(start_or_memory: dict[str, Any] | None) -> str:
+    body = _body_dict(start_or_memory)
+    if not body:
+        return ""
+    return str(
+        body.get("memory_summary")
+        or body.get("memory_context")
+        or body.get("summary")
+        or ""
+    )
+
+
+def _extract_npc_response(chat_result: dict[str, Any] | None) -> str:
+    body = _body_dict(chat_result)
+    return str(body.get("npc_response") or body.get("response") or "")
 
 
 def stage_prereq() -> dict[str, Any]:
@@ -278,9 +377,28 @@ def stage_runtime(npc: str, base_url: str, reload_model: bool) -> dict[str, Any]
     return result
 
 
-def stage_memory(npc: str, base_url: str, player_id: str, message: str, skip_live_probe: bool) -> dict[str, Any]:
+def stage_memory(
+    npc: str,
+    base_url: str,
+    player_id: str,
+    message: str,
+    skip_live_probe: bool,
+    cross_session: bool = False,
+    recall_message: str = "Do you remember our last conversation? Continue from that subject.",
+    memory_wait_seconds: float = 8.0,
+) -> dict[str, Any]:
     if skip_live_probe:
         return {"skipped": True, "reason": "--skip-live-probe"}
+
+    if cross_session:
+        return stage_cross_session_memory(
+            npc=npc,
+            base_url=base_url,
+            player_id=player_id,
+            seed_message=message,
+            recall_message=recall_message,
+            memory_wait_seconds=memory_wait_seconds,
+        )
 
     start = http_json(
         "POST",
@@ -315,9 +433,114 @@ def stage_memory(npc: str, base_url: str, player_id: str, message: str, skip_liv
     return {
         "player_id": player_id,
         "message": message,
+        "cross_session": False,
         "start_session": start,
         "chat": chat,
         "end_session": ended,
+        "history": history,
+        "memories": memories,
+    }
+
+
+def stage_cross_session_memory(
+    npc: str,
+    base_url: str,
+    player_id: str,
+    seed_message: str,
+    recall_message: str,
+    memory_wait_seconds: float,
+) -> dict[str, Any]:
+    """Mirror /test-10-player Phase 1/Phase 2 memory proof in a report file."""
+    phase1_start = http_json(
+        "POST",
+        f"{base_url}/session/start",
+        {"player_id": player_id, "npc_id": npc, "player_name": "Workflow Probe"},
+        timeout=20,
+    )
+    phase1_session_id = _body_dict(phase1_start).get("session_id")
+    phase1_chat = None
+    phase1_end = None
+    phase1_memory = None
+    if phase1_session_id:
+        phase1_chat = http_json(
+            "POST",
+            f"{base_url}/chat",
+            {
+                "player_id": player_id,
+                "npc_id": npc,
+                "message": seed_message,
+                "session_id": phase1_session_id,
+            },
+            timeout=120,
+        )
+        phase1_end = http_json(
+            "POST",
+            f"{base_url}/session/end",
+            {"session_id": phase1_session_id, "player_id": player_id, "npc_id": npc},
+            timeout=20,
+        )
+
+    if memory_wait_seconds > 0:
+        time.sleep(memory_wait_seconds)
+
+    phase1_memory = http_json("GET", f"{base_url}/debug/memory/{player_id}/{npc}", timeout=20)
+    phase2_start = http_json(
+        "POST",
+        f"{base_url}/session/start",
+        {"player_id": player_id, "npc_id": npc, "player_name": "Workflow Probe"},
+        timeout=20,
+    )
+    phase2_session_id = _body_dict(phase2_start).get("session_id")
+    memory_context = _extract_memory_context(phase2_start) or _extract_memory_context(phase1_memory)
+    phase2_chat = None
+    phase2_end = None
+    if phase2_session_id:
+        phase2_chat = http_json(
+            "POST",
+            f"{base_url}/chat",
+            {
+                "player_id": player_id,
+                "npc_id": npc,
+                "message": recall_message,
+                "session_id": phase2_session_id,
+            },
+            timeout=120,
+        )
+        phase2_end = http_json(
+            "POST",
+            f"{base_url}/session/end",
+            {"session_id": phase2_session_id, "player_id": player_id, "npc_id": npc},
+            timeout=20,
+        )
+
+    recall_response = _extract_npc_response(phase2_chat)
+    memory_used, memory_reason = response_uses_memory(memory_context, recall_message, recall_response)
+    history = http_json("GET", f"{base_url}/session/history/{player_id}/{npc}", timeout=20)
+    memories = http_json("GET", f"{base_url}/players/{player_id}/memories", timeout=20)
+
+    return {
+        "player_id": player_id,
+        "cross_session": True,
+        "seed_message": seed_message,
+        "recall_message": recall_message,
+        "phase1_session_id": phase1_session_id,
+        "phase2_session_id": phase2_session_id,
+        "memory_loaded_on_start": bool(memory_context),
+        "memory_context_preview": memory_context[:500],
+        "memory_used_in_response": memory_used,
+        "memory_response_reason": memory_reason,
+        "recall_response_preview": recall_response[:500],
+        "phase1": {
+            "start_session": phase1_start,
+            "chat": phase1_chat,
+            "end_session": phase1_end,
+            "memory_after_end": phase1_memory,
+        },
+        "phase2": {
+            "start_session": phase2_start,
+            "chat": phase2_chat,
+            "end_session": phase2_end,
+        },
         "history": history,
         "memories": memories,
     }
@@ -354,7 +577,12 @@ def build_summary(trace: dict[str, Any]) -> str:
     training = metrics.get("training", {}) if isinstance(metrics, dict) else {}
     lines.append(f"- Best eval loss: {training.get('best_eval_loss')}")
     lines.append(f"- Runtime health: {runtime.get('health', {}).get('ok')}")
-    lines.append(f"- Memory probe: {memory.get('end_session', {}).get('ok') if isinstance(memory, dict) else None}")
+    if isinstance(memory, dict) and memory.get("cross_session"):
+        lines.append(f"- Memory loaded on phase 2 start: {memory.get('memory_loaded_on_start')}")
+        lines.append(f"- Memory used in recall response: {memory.get('memory_used_in_response')}")
+        lines.append(f"- Memory response reason: {memory.get('memory_response_reason')}")
+    else:
+        lines.append(f"- Memory probe: {memory.get('end_session', {}).get('ok') if isinstance(memory, dict) else None}")
     lines.extend(["", "## Next Actions"])
     lines.extend(next_actions(trace))
     return "\n".join(lines).rstrip() + "\n"
@@ -383,6 +611,11 @@ def gate_status(stage_name: str, data: dict[str, Any]) -> str:
     if stage_name == "memory":
         if data.get("skipped"):
             return "skipped"
+        if data.get("cross_session"):
+            phase1_ok = data.get("phase1", {}).get("end_session", {}).get("ok")
+            phase2_ok = data.get("phase2", {}).get("end_session", {}).get("ok")
+            memory_ok = data.get("memory_loaded_on_start") and data.get("memory_used_in_response")
+            return "pass" if phase1_ok and phase2_ok and memory_ok else "check"
         return "pass" if data.get("start_session", {}).get("ok") and data.get("end_session", {}).get("ok") else "check"
     return "check"
 
@@ -395,18 +628,21 @@ def next_actions(trace: dict[str, Any]) -> list[str]:
     artifact = stages.get("artifact", {})
     runtime = stages.get("runtime", {})
     memory = stages.get("memory", {})
-    if imported.get("record_count", 0) == 0:
+    if "import" in stages and imported.get("record_count", 0) == 0:
         actions.append("- Generate/import NotebookLM JSONL batches for this NPC.")
-    elif imported.get("summary", {}).get("memory_slot_rate") != 1.0:
+    elif "import" in stages and imported.get("summary", {}).get("memory_slot_rate") != 1.0:
         actions.append("- Re-import with the NotebookLM importer so every system prompt has the memory slot.")
-    if prepared.get("splits", {}).get("train", 0) == 0:
+    if "prepare" in stages and prepared.get("splits", {}).get("train", 0) == 0:
         actions.append("- Run dataset preparation after import succeeds.")
-    if not artifact.get("manifest_exists"):
+    if "artifact" in stages and not artifact.get("manifest_exists"):
         actions.append("- Run a LoRA smoke train or full training run to create the manifest and adapter.")
-    if not runtime.get("health", {}).get("ok"):
+    if "runtime" in stages and not runtime.get("health", {}).get("ok"):
         actions.append("- Start the LLM/chat servers before runtime validation.")
-    if isinstance(memory, dict) and not memory.get("skipped") and not memory.get("end_session", {}).get("ok"):
-        actions.append("- Check Supabase connection and session end flow before relying on runtime memory.")
+    if isinstance(memory, dict) and not memory.get("skipped"):
+        if memory.get("cross_session") and not memory.get("memory_used_in_response"):
+            actions.append("- Inspect cross-session recall: memory loaded but the response did not use specific stored facts.")
+        elif not memory.get("cross_session") and not memory.get("end_session", {}).get("ok"):
+            actions.append("- Check Supabase connection and session end flow before relying on runtime memory.")
     if not actions:
         actions.append("- Compare this trace with the previous run and tune the weakest metric first.")
     return actions
@@ -448,6 +684,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default=os.environ.get("LLM_SERVER_URL", "http://127.0.0.1:8000"))
     parser.add_argument("--player-id", default="workflow_probe")
     parser.add_argument("--message", default="Give me one quick review question from our current lesson.")
+    parser.add_argument(
+        "--cross-session-memory",
+        action="store_true",
+        help="During memory stage, run Phase 1 create-memory plus Phase 2 recall proof.",
+    )
+    parser.add_argument(
+        "--recall-message",
+        default="Do you remember our last conversation? Continue from that subject.",
+        help="Recall prompt for --cross-session-memory.",
+    )
+    parser.add_argument(
+        "--memory-wait-seconds",
+        type=float,
+        default=8.0,
+        help="Seconds to wait after ending Phase 1 before starting recall.",
+    )
     parser.add_argument("--reload-model", action="store_true", help="POST /reload-model during runtime stage.")
     parser.add_argument("--skip-live-probe", action="store_true", help="Skip live session/chat/end memory probe.")
     return parser.parse_args()
@@ -494,6 +746,9 @@ def main() -> int:
                 args.player_id,
                 args.message,
                 args.skip_live_probe,
+                args.cross_session_memory,
+                args.recall_message,
+                args.memory_wait_seconds,
             )
 
     write_report_files(report_dir, trace)

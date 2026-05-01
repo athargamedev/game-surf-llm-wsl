@@ -1,0 +1,250 @@
+{
+  "run_id": "20260501_065452",
+  "generated_at": "2026-05-01T06:55:07-03:00",
+  "npc_id": "solar_system_instructor",
+  "benchmark_path": "benchmarks/npc_dialogue/solar_system_instructor.json",
+  "base_url": "http://127.0.0.1:8000",
+  "total_cases": 5,
+  "passed_cases": 4,
+  "pass_rate": 0.8,
+  "cases": [
+    {
+      "id": "inner_planets_rocky",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_065452_01",
+      "session_id": "967275c8-5b91-42b0-b683-542a2451ddc3",
+      "passed": false,
+      "issues": [
+        "required_terms:1/3"
+      ],
+      "response_preview": "The rocky planets, Mercury to Mars, are thought to have formed from the inner Solar System's gravitational zone where temperatures were too low for volatile compounds like water and ammonia to condense. In contrast, the outer planets and their large moons likely assembled through a different process involving icy bodies that could trap these volatiles in",
+      "start_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.049,
+        "body": {
+          "session_id": "967275c8-5b91-42b0-b683-542a2451ddc3",
+          "player_id": "dialogue_benchmark_20260501_065452_01",
+          "npc_id": "solar_system_instructor",
+          "memory_summary": null
+        }
+      },
+      "chat": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 1.167,
+        "body": {
+          "npc_response": "The rocky planets, Mercury to Mars, are thought to have formed from the inner Solar System's gravitational zone where temperatures were too low for volatile compounds like water and ammonia to condense. In contrast, the outer planets and their large moons likely assembled through a different process involving icy bodies that could trap these volatiles in",
+          "session_id": "967275c8-5b91-42b0-b683-542a2451ddc3"
+        }
+      },
+      "end_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.04,
+        "body": {
+          "status": "ended",
+          "session_id": "967275c8-5b91-42b0-b683-542a2451ddc3"
+        }
+      }
+    },
+    {
+      "id": "astronomical_unit_scale",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_065452_02",
+      "session_id": "c499f7d6-0a42-4f42-83d2-23d5188d0f76",
+      "passed": true,
+      "issues": [],
+      "response_preview": "Astronomical units, or AU for short, are a way to measure the distance between objects in our Solar System. One astronomical unit is equal to the average distance from Earth to the Sun: about 93 million miles (149.6 million kilometers). For example, Neptune's orbit takes it an additional 30",
+      "start_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.027,
+        "body": {
+          "session_id": "c499f7d6-0a42-4f42-83d2-23d5188d0f76",
+          "player_id": "dialogue_benchmark_20260501_065452_02",
+          "npc_id": "solar_system_instructor",
+          "memory_summary": null
+        }
+      },
+      "chat": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 1.19,
+        "body": {
+          "npc_response": "Astronomical units, or AU for short, are a way to measure the distance between objects in our Solar System. One astronomical unit is equal to the average distance from Earth to the Sun: about 93 million miles (149.6 million kilometers). For example, Neptune's orbit takes it an additional 30",
+          "session_id": "c499f7d6-0a42-4f42-83d2-23d5188d0f76"
+        }
+      },
+      "end_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.028,
+        "body": {
+          "status": "ended",
+          "session_id": "c499f7d6-0a42-4f42-83d2-23d5188d0f76"
+        }
+      }
+    },
+    {
+      "id": "small_bodies_formation",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_065452_03",
+      "session_id": "b8df7a7a-9b97-45b4-91c0-e8e88d14f918",
+      "passed": true,
+      "issues": [],
+      "response_preview": "Asteroids and comets provide valuable insights into the early Solar System's structure, composition, and evolution. They are remnants from a time when the Sun was still in its infancy, offering clues about the formation of planets through their unique compositions and orbital patterns.",
+      "start_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.022,
+        "body": {
+          "session_id": "b8df7a7a-9b97-45b4-91c0-e8e88d14f918",
+          "player_id": "dialogue_benchmark_20260501_065452_03",
+          "npc_id": "solar_system_instructor",
+          "memory_summary": null
+        }
+      },
+      "chat": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 1.009,
+        "body": {
+          "npc_response": "Asteroids and comets provide valuable insights into the early Solar System's structure, composition, and evolution. They are remnants from a time when the Sun was still in its infancy, offering clues about the formation of planets through their unique compositions and orbital patterns.",
+          "session_id": "b8df7a7a-9b97-45b4-91c0-e8e88d14f918"
+        }
+      },
+      "end_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.028,
+        "body": {
+          "status": "ended",
+          "session_id": "b8df7a7a-9b97-45b4-91c0-e8e88d14f918"
+        }
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_065452_04",
+      "session_id": "28f6d7da-3d0d-42da-bf42-3fe36db43257",
+      "passed": true,
+      "issues": [],
+      "response_preview": "I'm afraid I don't know how to tune a database index for a Supabase app. My expertise lies in the Solar System, not databases or programming languages like SQL.",
+      "start_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.022,
+        "body": {
+          "session_id": "28f6d7da-3d0d-42da-bf42-3fe36db43257",
+          "player_id": "dialogue_benchmark_20260501_065452_04",
+          "npc_id": "solar_system_instructor",
+          "memory_summary": null
+        }
+      },
+      "chat": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.74,
+        "body": {
+          "npc_response": "I'm afraid I don't know how to tune a database index for a Supabase app. My expertise lies in the Solar System, not databases or programming languages like SQL.",
+          "session_id": "28f6d7da-3d0d-42da-bf42-3fe36db43257"
+        }
+      },
+      "end_session": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.025,
+        "body": {
+          "status": "ended",
+          "session_id": "28f6d7da-3d0d-42da-bf42-3fe36db43257"
+        }
+      }
+    },
+    {
+      "id": "cross_session_jupiter_memory",
+      "type": "cross_session_memory",
+      "player_id": "dialogue_benchmark_20260501_065452_05",
+      "phase1_session_id": "4fdaca06-54b6-4a6c-9f62-eb025dc3c2d0",
+      "phase2_session_id": "ed90af27-d226-4904-826c-c66e528ae5aa",
+      "memory_loaded_on_start": true,
+      "memory_context_preview": "Player: Please remember that I am most curious about Jupiter's Great Red Spot and why it has lasted so long.\nNPC: Jupiter's Great Red Spot is a persistent anticyclonic storm that has been raging for centuries. It's estimated to be around 10,000 km wide and 7 miles high, which is roughly the size of Earth in diameter. The exact cause of its longevity re",
+      "passed": true,
+      "issues": [],
+      "recall_response_preview": "Jupiter's Great Red Spot is a persistent anticyclonic storm that has been raging for centuries. It's estimated to be around 10,000 km wide and could swallow several Earths whole in terms of size.",
+      "phase1": {
+        "start_session": {
+          "ok": true,
+          "status_code": 200,
+          "duration_seconds": 0.022,
+          "body": {
+            "session_id": "4fdaca06-54b6-4a6c-9f62-eb025dc3c2d0",
+            "player_id": "dialogue_benchmark_20260501_065452_05",
+            "npc_id": "solar_system_instructor",
+            "memory_summary": null
+          }
+        },
+        "chat": {
+          "ok": true,
+          "status_code": 200,
+          "duration_seconds": 1.248,
+          "body": {
+            "npc_response": "Jupiter's Great Red Spot is a persistent anticyclonic storm that has been raging for centuries. It's estimated to be around 10,000 km wide and 7 miles high, which is roughly the size of Earth in diameter. The exact cause of its longevity remains unclear, but it may be related to",
+            "session_id": "4fdaca06-54b6-4a6c-9f62-eb025dc3c2d0"
+          }
+        },
+        "end_session": {
+          "ok": true,
+          "status_code": 200,
+          "duration_seconds": 0.025,
+          "body": {
+            "status": "ended",
+            "session_id": "4fdaca06-54b6-4a6c-9f62-eb025dc3c2d0"
+          }
+        }
+      },
+      "phase2": {
+        "start_session": {
+          "ok": true,
+          "status_code": 200,
+          "duration_seconds": 0.038,
+          "body": {
+            "session_id": "ed90af27-d226-4904-826c-c66e528ae5aa",
+            "player_id": "dialogue_benchmark_20260501_065452_05",
+            "npc_id": "solar_system_instructor",
+            "memory_summary": "Player: Please remember that I am most curious about Jupiter's Great Red Spot and why it has lasted so long.\nNPC: Jupiter's Great Red Spot is a persistent anticyclonic storm that has been raging for centuries. It's estimated to be around 10,000 km wide and 7 miles high, which is roughly the size of Earth in diameter. The exact cause of its longevity re"
+          }
+        },
+        "chat": {
+          "ok": true,
+          "status_code": 200,
+          "duration_seconds": 0.938,
+          "body": {
+            "npc_response": "Jupiter's Great Red Spot is a persistent anticyclonic storm that has been raging for centuries. It's estimated to be around 10,000 km wide and could swallow several Earths whole in terms of size.",
+            "session_id": "ed90af27-d226-4904-826c-c66e528ae5aa"
+          }
+        },
+        "end_session": {
+          "ok": true,
+          "status_code": 200,
+          "duration_seconds": 0.036,
+          "body": {
+            "status": "ended",
+            "session_id": "ed90af27-d226-4904-826c-c66e528ae5aa"
+          }
+        }
+      },
+      "memory_after_phase1": {
+        "ok": true,
+        "status_code": 200,
+        "duration_seconds": 0.043,
+        "body": {
+          "player_id": "dialogue_benchmark_20260501_065452_05",
+          "npc_id": "solar_system_instructor",
+          "memory_context": "Player Profile:\nDisplay name: dialogue_benchmark_20260501_065452_05\n\nRecent NPC Memories:\nTotal conversations: 1\n1. [1t] Player: Please remember that I am most curious about Jupiter's Great Red Spot and why it has lasted so long. NPC: Jupiter's Great Red Spot is a persistent anticyclonic storm that has been raging for centuries. It's estimated to be around 10,000 km wi"
+        }
+      }
+    }
+  ]
+}

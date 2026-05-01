@@ -18,6 +18,12 @@ PERSONAS_DIR = ROOT_DIR / "datasets" / "personas"
 REQUIRED_METADATA = {
     "source_kind": "notebooklm_direct",
 }
+ALLOWED_TASK_TYPES = {
+    "teaching",
+    "quiz",
+    "redirect",
+    "refusal",
+}
 
 MEMORY_SLOT_TEMPLATE = "[MEMORY_CONTEXT: {memory_slot}]"
 FORBIDDEN_ASSISTANT_TERMS = [
@@ -202,7 +208,7 @@ def validate_and_normalize(
         "npc_key": profile_key,
         "npc_scope": profile.get("npc_scope", "instructor"),
     }
-    if metadata.get("task_type") not in {"teaching", "quiz"}:
+    if metadata.get("task_type") not in ALLOWED_TASK_TYPES:
         metadata["task_type"] = "teaching"
     quality, signals = compute_quality_score(
         normalized_messages[0]["content"],

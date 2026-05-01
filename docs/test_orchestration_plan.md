@@ -44,6 +44,14 @@ Automated test that simulates 10 new players interacting with NPCs to validate t
 5. Verify memory was created in Supabase
 6. Move to next player
 
+**Cross-session mode** is the required memory proof:
+1. Phase 1 sends message 1, ends the session, and waits until `npc_memories` exists.
+2. Phase 2 starts a new session with the same generated `player_id` and `npc_id`.
+3. The test checks `memory_loaded_on_start=true`.
+4. The test also checks `memory_used_in_response=true` for recall-style message 2.
+
+`memory_loaded_on_start=true` alone is not a pass. It only proves Supabase returned a memory row; the NPC can still ignore that row and answer "I don't remember." Treat that as runtime prompt/model-use failure.
+
 ## Web Interface (test_10_player_memory.html)
 
 A web form allows the user to configure the test before starting:
@@ -263,6 +271,16 @@ The test uses a single Python file that serves both the HTML frontend and handle
   - End + memory wait: 15-20s
 - Total: ~7-8 minutes for 10 players
 
+## Current Implementation Notes
+
+- Live page: `http://127.0.0.1:8000/test-10-player`
+- The page supports multiple enabled NPC cards, including `solar_system_instructor`.
+- The test uses unique run IDs in generated player IDs to avoid stale `TestPlayer_*` memories from previous runs.
+- Runtime prompt injection includes a memory rule telling the model to answer recall questions from `Recent NPC Memories`.
+- If a recall answer denies memory despite loaded memory, the backend retries once with an explicit memory-use instruction.
+- The UI reports `✓ used memory` or `✗ ignored memory` for Phase 2 recall answers.
+- Python `/chat` writes keep `dialogue_sessions.turn_count` synchronized after inserting `dialogue_turns`.
+
 ## Success Criteria
 
 1. ✅ All 10 players complete sessions without errors
@@ -271,6 +289,8 @@ The test uses a single Python file that serves both the HTML frontend and handle
 4. ✅ Dialogue turns properly recorded for each session
 5. ✅ LoRA adapter switching works (verified by successful NPC responses)
 6. ✅ Supabase data integrity (no duplicate sessions, proper status updates)
+7. ✅ Cross-session Phase 2 reports `memory_loaded_on_start=true`
+8. ✅ Cross-session Phase 2 reports `memory_used_in_response=true`
 
 ## Next Steps
 

@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "base_model": "unsloth/Llama-3.2-3B-Instruct",
   "dataset": {
-    "target_generation_count": 25,
+    "target_generation_count": 78,
     "quality_threshold": 0.75,
     "val_split": 0.1,
     "raw_dataset_path": "/root/Game_Surf/Tools/LLM_WSL/datasets/personas/solar_system_instructor/solar_system_dataset.jsonl",
@@ -15,7 +15,7 @@
     "val_file": "datasets/processed/solar_system_dataset/validation.jsonl"
   },
   "training": {
-    "epochs": 4,
+    "epochs": 24,
     "learning_rate": 0.0002,
     "lora_r": 16,
     "lora_alpha": 32,

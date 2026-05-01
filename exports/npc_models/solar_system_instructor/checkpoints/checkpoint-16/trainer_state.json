@@ -1,0 +1,58 @@
+{
+  "best_global_step": 16,
+  "best_metric": 1.9989255666732788,
+  "best_model_checkpoint": "exports/npc_models/solar_system_instructor/checkpoints/checkpoint-16",
+  "epoch": 1.0,
+  "eval_steps": 25,
+  "global_step": 16,
+  "is_hyper_param_search": false,
+  "is_local_process_zero": true,
+  "is_world_process_zero": true,
+  "log_history": [
+    {
+      "epoch": 0.6451612903225806,
+      "grad_norm": 5.223586559295654,
+      "learning_rate": 0.00014154150130018866,
+      "loss": 2.1131851196289064,
+      "step": 10
+    },
+    {
+      "epoch": 1.0,
+      "eval_loss": 1.9989255666732788,
+      "eval_runtime": 1.2067,
+      "eval_samples_per_second": 4.972,
+      "eval_steps_per_second": 2.486,
+      "step": 16
+    }
+  ],
+  "logging_steps": 10,
+  "max_steps": 16,
+  "num_input_tokens_seen": 0,
+  "num_train_epochs": 1,
+  "save_steps": 25,
+  "stateful_callbacks": {
+    "EarlyStoppingCallback": {
+      "args": {
+        "early_stopping_patience": 5,
+        "early_stopping_threshold": 0.001
+      },
+      "attributes": {
+        "early_stopping_patience_counter": 0
+      }
+    },
+    "TrainerControl": {
+      "args": {
+        "should_epoch_stop": false,
+        "should_evaluate": false,
+        "should_log": false,
+        "should_save": true,
+        "should_training_stop": true
+      },
+      "attributes": {}
+    }
+  },
+  "total_flos": 229861501900800.0,
+  "train_batch_size": 1,
+  "trial_name": null,
+  "trial_params": null
+}

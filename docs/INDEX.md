@@ -1,7 +1,7 @@
 # Game_Surf LLM Documentation - Index
 
 > **Central Table of Contents** - Start here for all documentation
-> **Last Updated**: 2026-04-18
+> **Last Updated**: 2026-05-01
 
 ---
 
@@ -20,6 +20,7 @@
 |----------|---------|
 | [docs/ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, components, data flow |
 | [docs/PIPELINE_REFERENCE.md](PIPELINE_REFERENCE.md) | Full pipeline technical reference |
+| [docs/PROJECT_CONTEXT_INTELLIGENCE.md](PROJECT_CONTEXT_INTELLIGENCE.md) | Durable workflow lessons and current project decisions |
 
 ---
 
@@ -28,6 +29,9 @@
 | Document | Purpose |
 |----------|---------|
 | [docs/PIPELINE_REFERENCE.md](PIPELINE_REFERENCE.md) | Complete pipeline (generation → training → export) |
+| [docs/NOTEBOOKLM_DATASET_WORKFLOW.md](NOTEBOOKLM_DATASET_WORKFLOW.md) | NotebookLM-backed dataset creation workflow |
+| [docs/test_orchestration_plan.md](test_orchestration_plan.md) | Automated `/test-10-player` memory validation logic |
+| [docs/DIALOGUE_WORKFLOW_REVIEW.md](DIALOGUE_WORKFLOW_REVIEW.md) | Review of dialogue testing/tracking gaps and improvement roadmap |
 | [scripts/run_full_npc_pipeline.py](../scripts/run_full_npc_pipeline.py) | Main orchestrator entry point |
 
 ---
@@ -58,6 +62,9 @@
 | [scripts/llm_integrated_server.py](../scripts/llm_integrated_server.py) | FastAPI server (port 8000) |
 | [scripts/generate_npc_dataset.py](../scripts/generate_npc_dataset.py) | Dataset generation |
 | [scripts/convert_lora_to_gguf.py](../scripts/convert_lora_to_gguf.py) | GGUF export |
+| [scripts/track_workflow_run.py](../scripts/track_workflow_run.py) | Workflow trace and cross-session memory proof |
+| [scripts/run_dialogue_benchmark.py](../scripts/run_dialogue_benchmark.py) | Fixed NPC dialogue benchmark runner |
+| [scripts/repair_memory_state.py](../scripts/repair_memory_state.py) | Supabase memory diagnostics and metadata repair |
 
 ---
 
@@ -78,6 +85,7 @@
 
 NPC knowledge files are stored in `research/<npc_id>/`:
 - `research/maestro_jazz_instructor/` - Jazz history
+- `research/solar_system_instructor/` - Solar System science
 - `research/brazilian_history/` - Brazilian history
 - `research/greek_mythology_instructor/` - Greek mythology
 

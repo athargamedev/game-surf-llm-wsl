@@ -47,7 +47,8 @@ cd /root/Game_Surf/Tools/LLM_WSL
 5. **Validate runtime readiness**
    - Check `lora_adapter/` and `npc_model_manifest.json`.
    - Restart with `python scripts/server_manager.py start --auto` or `python scripts/server_manager.py restart --session llm-server`.
-   - Add the NPC to `/test-10-player`, then validate chat + Supabase memory creation.
+   - Add the NPC to `chat_interface.html` and `/test-10-player`, then validate chat + Supabase memory creation.
+   - In `/test-10-player` cross-session mode, require `memory_loaded_on_start=true` and `memory_used_in_response=true`.
 
 ---
 
@@ -166,6 +167,7 @@ notebooklm list
 - Keep both `teaching` and `quiz` represented after filtering
 - Preparation can now enforce minimum per-task coverage with `--min-task-examples`
 - Smaller 10-example NotebookLM batches are the preferred fallback when 50-example asks time out
+- Runtime readiness is not complete until recall answers use loaded memory, not just until Supabase creates memory rows
 
 ---
 

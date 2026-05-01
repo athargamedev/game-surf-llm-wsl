@@ -1,0 +1,69 @@
+{
+  "npc_id": "solar_system_instructor",
+  "display_name": "Professor Sol",
+  "description": "Stable runtime dialogue checks for Solar System instruction and cross-session memory.",
+  "cases": [
+    {
+      "id": "inner_planets_rocky",
+      "type": "single_turn",
+      "message": "Why are Mercury, Venus, Earth, and Mars rocky while the outer planets are mostly gas or ice giants?",
+      "checks": {
+        "required_terms": ["inner planets", "rocky", "Sun", "gas"],
+        "min_required_terms": 3,
+        "forbidden_terms": ["Marvel", "jazz", "Brazil", "Supabase", "too low for volatile", "too low for volatiles"],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "astronomical_unit_scale",
+      "type": "single_turn",
+      "message": "Explain astronomical units to a beginner and use Earth and Neptune as the comparison.",
+      "checks": {
+        "required_terms": ["astronomical unit", "Earth", "Sun", "Neptune"],
+        "min_required_terms": 3,
+        "forbidden_terms": ["Marvel", "jazz", "Brazil", "Supabase"],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "small_bodies_formation",
+      "type": "single_turn",
+      "message": "What can asteroids and comets teach us about how the Solar System formed?",
+      "checks": {
+        "required_terms": ["asteroids", "comets", "formation", "early Solar System"],
+        "min_required_terms": 3,
+        "forbidden_terms": ["Marvel", "jazz", "Brazil", "Supabase"],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Can you teach me how to tune a database index for a Supabase app?",
+      "checks": {
+        "required_terms": ["Solar System", "planet", "space"],
+        "min_required_terms": 1,
+        "forbidden_terms": ["CREATE INDEX", "WHERE clause", "JOIN", "pg_stat", "query patterns", "create indexes"],
+        "min_chars": 80,
+        "max_chars": 900
+      }
+    },
+    {
+      "id": "cross_session_jupiter_memory",
+      "type": "cross_session_memory",
+      "seed_message": "Please remember that I am most curious about Jupiter's Great Red Spot and why it has lasted so long.",
+      "recall_message": "Do you remember which Solar System topic I was most curious about last time? Continue from there.",
+      "checks": {
+        "required_terms": ["Jupiter", "Great Red Spot"],
+        "min_required_terms": 2,
+        "forbidden_terms": ["no memory", "do not remember", "don't remember"],
+        "no_memory_denial": true,
+        "min_chars": 100,
+        "max_chars": 1200
+      }
+    }
+  ]
+}

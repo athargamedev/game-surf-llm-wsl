@@ -114,6 +114,7 @@ The key contract resolver (`scripts/npc_pipeline_contract.py`) auto-derives all 
 6. Restart servers properly
 7. Test via chat and `/test-10-player`
 8. Confirm Supabase memories persist
+9. Confirm recall answers actually use the loaded memory
 
 **Decision tips**
 - Prefer NotebookLM-direct for dataset creation; local synthetic generation is a fallback only
@@ -124,7 +125,8 @@ The key contract resolver (`scripts/npc_pipeline_contract.py`) auto-derives all 
 - Stop the runtime LLM server before training if VRAM is near full
 - Restart with `python scripts/server_manager.py start --auto` or `python scripts/server_manager.py restart --session llm-server`
 - Add the NPC to `/test-10-player` before final runtime validation
-- Treat `/test-10-player` + Supabase memory creation as final operational proof
+- Treat `/test-10-player` + Supabase memory creation + `memory_used_in_response=true` as final operational proof
+- Use unique per-run test player IDs so old memories do not contaminate new test results
 
 ---
 
@@ -264,7 +266,31 @@ conda run --no-capture-output -n unsloth_env python \
   --skip-live-probe
 ```
 
-Run `--stage runtime --reload-model` and `--stage memory` after the WSL runtime server is running.
+Run `--stage runtime --reload-model` and `--stage memory` after the WSL runtime server is running. Use cross-session memory proof before comparing training runs:
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  scripts/track_workflow_run.py \
+  --npc solar_system_instructor \
+  --stage memory \
+  --cross-session-memory \
+  --player-id workflow_probe_solar
+```
+
+Fixed dialogue benchmarks live under `benchmarks/npc_dialogue/` and write reports under `reports/dialogue_benchmarks/`:
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  scripts/run_dialogue_benchmark.py \
+  --npc solar_system_instructor
+```
+
+Supabase memory diagnostics are dry-run by default:
+
+```bash
+conda run --no-capture-output -n unsloth_env python \
+  scripts/repair_memory_state.py --json
+```
 
 ---
 
@@ -283,6 +309,12 @@ The relay:
 3. Prepends the system prompt and memory context.
 4. Runs the shared base model plus the selected NPC LoRA adapter in the WSL runtime.
 5. Writes the assistant response back to Supabase and returns it to Unity.
+
+Memory validation contract:
+- `memory_loaded_on_start=true` proves Supabase returned a prior memory row.
+- `memory_used_in_response=true` proves the answer actually used loaded memory.
+- If an NPC denies memory while memory loaded, treat it as prompt/model-use failure, not a missing database row.
+- Python `/chat` writes `dialogue_turns`; keep `dialogue_sessions.turn_count` synchronized for diagnostics and Edge-function parity.
 
 ---
 
@@ -342,6 +374,18 @@ python scripts/server_manager.py start --auto
 - Final losses: train `1.875`, eval `1.936`
 - Runtime validation succeeded after adding `brazilian_history_instructor` to `/test-10-player`
 - Automated test answered correctly and populated Supabase NPC memories
+
+### Worked Example: `solar_system_instructor`
+
+- NotebookLM notebook: `Solar_System_Instructor`
+- Reliable generation strategy: narrowed 10-example batches
+- Import result: `49 valid unique`, memory slot rate `1.0`
+- Prepared splits: `45 train / 4 validation`
+- Training: WSL-native Unsloth smoke training
+- Eval loss: `1.7207202911376953`
+- Runtime validation succeeded after adding `Professor Sol` to `chat_interface.html` and `/test-10-player`
+- Cross-session memory test initially revealed false-positive logic: Supabase loaded memory, but the NPC still denied recall
+- Runtime/test fix added `memory_used_in_response` and a memory-recall retry guard; focused Solar validation then answered from the stored Jupiter memory
 
 ---
 

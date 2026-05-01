@@ -202,6 +202,53 @@ Return exactly {count} JSONL lines.
 """
 
 
+def dialogue_repair_prompt_for(npc_key: str, profile: dict[str, Any], subject: str, count: int) -> str:
+    personality = profile.get("personality", {})
+    rules = " ".join(profile.get("voice_rules", [])[:4]) or "Stay concise and in character."
+    redirect_count = max(6, round(count * 0.40))
+    memory_count = max(6, round(count * 0.40))
+    factual_count = max(0, count - redirect_count - memory_count)
+    return f"""Create exactly {count} benchmark-repair NPC fine-tuning examples for Game_Surf.
+
+Use NotebookLM as a source-aware planner before writing:
+- Internally inspect the loaded Solar System sources and project notes.
+- Ground all Solar System facts in the loaded sources.
+- Do not output planning notes, citations, Markdown, or explanations.
+
+Output JSONL only. Each physical line must be one complete JSON object:
+{{"messages":[{{"role":"system","content":"..."}},{{"role":"user","content":"..."}},{{"role":"assistant","content":"..."}}],"metadata":{{"npc_scope":"{profile.get('npc_scope', 'instructor')}","task_type":"redirect","source_kind":"notebooklm_direct","quality":0.9,"npc_key":"{npc_key}"}}}}
+
+NPC:
+- npc_key: {npc_key}
+- display name: {profile.get('display_name', npc_key)}
+- subject focus: {subject}
+- tone: {personality.get('tone', 'clear and educational')}
+- speaking style: {personality.get('speaking_style', 'concise and in character')}
+- target assistant length: 28-65 words
+- answer length: 2-3 sentences
+
+System message template:
+You are {profile.get('display_name', npc_key)}. [MEMORY_CONTEXT: {{player_memory_summary}}] Subject: {subject}. Style: {personality.get('tone', 'clear and educational')}; {personality.get('speaking_style', 'concise and in character')}. Rules: {rules} Max 3 sentences. Stay in character.
+
+Required coverage:
+- {redirect_count} redirect examples. The user asks off-topic questions about databases, SQL, Supabase, Marvel, jazz, code, or unrelated history. The assistant must briefly decline that topic and redirect to Solar System science. It must not answer the off-topic request. Use metadata task_type "redirect".
+- {memory_count} memory-continuation examples. The user asks what they discussed last time or asks to continue from a remembered Solar System topic such as Jupiter's Great Red Spot, astronomical units, Pluto as a dwarf planet, asteroid/comet comparison, or the Oort Cloud. The assistant must explicitly use the remembered topic and continue with a useful 2-3 sentence Solar System explanation. Use metadata task_type "teaching".
+- {factual_count} factual-strengthening examples focused on benchmark gaps: why inner planets are rocky, astronomical units, asteroids/comets as formation clues, and Solar System scale. Use metadata task_type "teaching" or "quiz".
+
+Critical rules:
+- Every system message must include exactly this literal text once: [MEMORY_CONTEXT: {{player_memory_summary}}]
+- Do not replace the memory slot with None or a real memory.
+- Put prior-learning references only in the user message.
+- Assistant must never mention AI, model, dataset, prompt, system prompt, training example, or citations.
+- Redirect examples must include at least one Solar System term in the assistant response, such as planet, orbit, Sun, asteroid, comet, or Solar System.
+- Redirect examples must not include instructions for SQL, Supabase, database indexes, code, Marvel lore, jazz history, or Brazilian history.
+- Memory-continuation examples must not say "I have no memory" or "I cannot remember"; they should continue from the learner's remembered topic.
+- Avoid duplicate user questions and duplicate assistant answers.
+
+Return exactly {count} JSONL lines.
+"""
+
+
 def compact_prompt_for(npc_key: str, profile: dict[str, Any], subject: str, count: int) -> str:
     personality = profile.get("personality", {})
     rules = " ".join(profile.get("voice_rules", [])[:4]) or "Stay concise and in character."
@@ -330,6 +377,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prepare", action="store_true")
     parser.add_argument("--smoke-train", action="store_true")
     parser.add_argument("--dry-import", action="store_true", help="Only run importer dry-run.")
+    parser.add_argument("--dialogue-repair", action="store_true", help="Generate benchmark repair examples for redirect and memory-continuation behavior.")
     parser.add_argument("--min-quality", type=float, default=0.75, help="Minimum importer/prep quality threshold.")
     parser.add_argument("--min-task-examples", type=int, default=5, help="Minimum examples per task type after import filtering.")
     return parser.parse_args()
@@ -347,7 +395,11 @@ def main() -> int:
     batch_path = research_dir / f"notebooklm_batch_{args.batch_id:02d}.jsonl"
 
     subject = args.subject or profile.get("subject_focus") or profile.get("subject") or args.npc
-    prompt = prompt_for(args.npc, profile, subject, args.count)
+    prompt = (
+        dialogue_repair_prompt_for(args.npc, profile, subject, args.count)
+        if args.dialogue_repair
+        else prompt_for(args.npc, profile, subject, args.count)
+    )
     prompt_path.write_text(prompt, encoding="utf-8")
     print(f"Prompt written: {prompt_path}")
 

@@ -482,6 +482,8 @@ def build_system_prompt(npc_id: str) -> str:
 
         if prof:
             display_name = prof.get("display_name", npc_id)
+            subject = prof.get("subject") or prof.get("subject_focus") or npc_id.replace("_", " ")
+            refusal_style = prof.get("personality", {}).get("refusal_style", "")
             voice_rules = prof.get("voice_rules", [])[:4]
             voice_rules_text = " ".join(f"- {rule}" for rule in voice_rules)
 
@@ -491,7 +493,10 @@ def build_system_prompt(npc_id: str) -> str:
             # No "You focus on X" — that phrase makes the model say "I'm X Analyst" or "I specialize in X"
             system_prompt = (
                 f"You are {clean_name}. {MEMORY_SLOT} "
+                f"Subject boundary: {subject}. "
                 f"{voice_rules_text} "
+                f"If the user asks outside this subject, do not answer the off-topic request; {refusal_style or 'briefly redirect back to your subject'}. "
+                "When MEMORY_CONTEXT contains a relevant prior topic and the user asks to remember or continue, name that topic and add one new concrete subject fact. "
                 "Answer in 1-3 sentences. Do NOT write 'Player:' or 'NPC:' labels. "
                 "Stop immediately after answering. Do not add follow-up questions."
             )
@@ -569,6 +574,8 @@ def load_player_context(player_id: str, npc_id: str, current_message: str = "") 
                 summary = (row.get("summary") or "").strip()
                 if summary:
                     raw = row.get("raw_json") or {}
+                    if raw.get("memory_kind") in {"recall_probe", "empty_session"}:
+                        continue
                     turn_count = raw.get("session_turn_count", "?")
                     summaries.append(f"[{turn_count}t] {summary[:250].replace(chr(10), ' ')}")
             if summaries:
@@ -2732,20 +2739,110 @@ def _log_test_result(result: dict, phase: str) -> None:
     try:
         if supabase_client is None:
             return
-        supabase_client.table("test_results").insert({
+
+        message_preview = "\n".join(str(m) for m in (result.get("messages_sent") or []) if m)[:500]
+        response_preview = "\n".join(str(r) for r in (result.get("responses_received") or []) if r)[:1000]
+        full_payload = {
+            "run_id": result.get("run_id") or test_state.get("run_id"),
             "player_id": result.get("player_id"),
+            "player_name": result.get("player_name"),
             "npc_id": result.get("npc_id"),
+            "session_id": result.get("session_id"),
+            "turn_count": result.get("turn_count"),
             "memory_created": result.get("memory_created"),
             "memory_loaded_on_start": result.get("memory_loaded_on_start"),
             "memory_persistence_verified": result.get("memory_persistence_verified"),
+            "memory_used_in_response": result.get("memory_used_in_response"),
+            "memory_response_reason": result.get("memory_response_reason"),
+            "memory_retry_attempts": result.get("memory_retry_attempts"),
+            "memory_retry_reason": result.get("memory_retry_reason"),
             "memory_quality_reason": result.get("memory_quality_reason"),
+            "history_verified": result.get("history_verified"),
+            "player_memories_verified": result.get("player_memories_verified"),
+            "god_memory_verified": result.get("god_memory_verified"),
             "identity_verified": result.get("identity_verified"),
+            "message_preview": message_preview,
+            "response_preview": response_preview,
             "error": result.get("error"),
             "phase": phase,
             "duration_seconds": result.get("duration_seconds"),
-        }).execute()
+            "raw_json": {
+                "messages_sent": result.get("messages_sent") or [],
+                "responses_received": result.get("responses_received") or [],
+            },
+        }
+        try:
+            supabase_client.table("test_results").insert(full_payload).execute()
+        except Exception as full_exc:
+            legacy_payload = {
+                "player_id": result.get("player_id"),
+                "npc_id": result.get("npc_id"),
+                "memory_created": result.get("memory_created"),
+                "memory_loaded_on_start": result.get("memory_loaded_on_start"),
+                "memory_persistence_verified": result.get("memory_persistence_verified"),
+                "memory_quality_reason": result.get("memory_quality_reason"),
+                "identity_verified": result.get("identity_verified"),
+                "error": result.get("error"),
+                "phase": phase,
+                "duration_seconds": result.get("duration_seconds"),
+            }
+            print(f"[WARN] Full test result insert failed, trying legacy payload: {full_exc}")
+            supabase_client.table("test_results").insert(legacy_payload).execute()
     except Exception as exc:
         print(f"[WARN] Failed to log test result: {exc}")
+
+
+def _test_report_payload(results: list[dict]) -> dict:
+    run_id = test_state.get("run_id")
+    passed_memory = [
+        r for r in results
+        if r.get("memory_loaded_on_start") and r.get("memory_used_in_response") is True
+    ]
+    failed_memory = [
+        r for r in results
+        if r.get("phase") == "Phase 2"
+        and (not r.get("memory_loaded_on_start") or r.get("memory_used_in_response") is not True)
+    ]
+    return {
+        "run_id": run_id,
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "config": test_state.get("config"),
+        "cross_session": test_state.get("cross_session", False),
+        "total_results": len(results),
+        "memory_recall_passed": len(passed_memory),
+        "memory_recall_failed": len(failed_memory),
+        "results": results,
+    }
+
+
+def _write_automated_test_reports() -> None:
+    """Write /test-10-player evidence into workflow report folders."""
+    try:
+        run_id = str(test_state.get("run_id") or time.strftime("%Y%m%d%H%M%S"))
+        with _test_lock:
+            results = [dict(r) for r in test_state.get("results", [])]
+        payload = _test_report_payload(results)
+        output_root = TOOLS_LLM_ROOT / "reports" / "workflow_runs"
+        combined_dir = output_root / "test-10-player" / run_id
+        combined_dir.mkdir(parents=True, exist_ok=True)
+        (combined_dir / "automated_memory_test.json").write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        npc_ids = sorted({r.get("npc_id") for r in results if r.get("npc_id")})
+        for npc_id in npc_ids:
+            npc_results = [r for r in results if r.get("npc_id") == npc_id]
+            npc_payload = _test_report_payload(npc_results)
+            npc_dir = output_root / str(npc_id) / run_id
+            npc_dir.mkdir(parents=True, exist_ok=True)
+            (npc_dir / "automated_memory_test.json").write_text(
+                json.dumps(npc_payload, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        print(f"[TEST] Wrote automated test report for run {run_id}")
+    except Exception as exc:
+        print(f"[WARN] Failed to write automated test report: {exc}")
 
 
 def wait_for_memory_with_retry(player_id: str, npc_id: str, 
@@ -2798,6 +2895,7 @@ def run_player_session_thread(
     global test_state
     
     result = {
+        "run_id": test_state.get("run_id"),
         "player_id": player_id,
         "player_name": player_name,
         "phase": phase_label,
@@ -2952,6 +3050,8 @@ def run_player_session_thread(
                         print(f"[OK] {player_id}: Phase 1 memory persisted to Phase 2")
                         result["memory_persistence_verified"] = True
                 
+                result["duration_seconds"] = time.time() - start_time
+
                 # Persist result to DB so it survives server restarts
                 _log_test_result(result, phase_label)
 
@@ -3122,6 +3222,7 @@ def run_full_test_thread(config: dict):
     trigger_graph_rebuild_sync()
     test_state["running"] = False
     test_state["phase"] = "complete"
+    _write_automated_test_reports()
 
 
 @app.get("/test-10-player", response_class=HTMLResponse)

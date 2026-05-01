@@ -1,0 +1,134 @@
+{
+  "run_id": "20260501_033823",
+  "generated_at": "2026-05-01T03:38:31-03:00",
+  "npc_id": "solar_system_instructor",
+  "benchmark_path": "benchmarks/npc_dialogue/solar_system_instructor.json",
+  "base_url": "http://127.0.0.1:8000",
+  "total_cases": 5,
+  "passed_cases": 0,
+  "pass_rate": 0.0,
+  "cases": [
+    {
+      "id": "inner_planets_rocky",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_033823_01",
+      "session_id": null,
+      "passed": false,
+      "issues": [
+        "required_terms:0/3",
+        "too_short:0<120"
+      ],
+      "response_preview": "",
+      "start_session": {
+        "ok": false,
+        "status_code": null,
+        "duration_seconds": 0.002,
+        "body": "<urlopen error [Errno 1] Operation not permitted>"
+      },
+      "chat": null,
+      "end_session": null
+    },
+    {
+      "id": "astronomical_unit_scale",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_033823_02",
+      "session_id": null,
+      "passed": false,
+      "issues": [
+        "required_terms:0/3",
+        "too_short:0<120"
+      ],
+      "response_preview": "",
+      "start_session": {
+        "ok": false,
+        "status_code": null,
+        "duration_seconds": 0.0,
+        "body": "<urlopen error [Errno 1] Operation not permitted>"
+      },
+      "chat": null,
+      "end_session": null
+    },
+    {
+      "id": "small_bodies_formation",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_033823_03",
+      "session_id": null,
+      "passed": false,
+      "issues": [
+        "required_terms:0/3",
+        "too_short:0<120"
+      ],
+      "response_preview": "",
+      "start_session": {
+        "ok": false,
+        "status_code": null,
+        "duration_seconds": 0.0,
+        "body": "<urlopen error [Errno 1] Operation not permitted>"
+      },
+      "chat": null,
+      "end_session": null
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "player_id": "dialogue_benchmark_20260501_033823_04",
+      "session_id": null,
+      "passed": false,
+      "issues": [
+        "required_terms:0/1",
+        "too_short:0<80"
+      ],
+      "response_preview": "",
+      "start_session": {
+        "ok": false,
+        "status_code": null,
+        "duration_seconds": 0.0,
+        "body": "<urlopen error [Errno 1] Operation not permitted>"
+      },
+      "chat": null,
+      "end_session": null
+    },
+    {
+      "id": "cross_session_jupiter_memory",
+      "type": "cross_session_memory",
+      "player_id": "dialogue_benchmark_20260501_033823_05",
+      "phase1_session_id": null,
+      "phase2_session_id": null,
+      "memory_loaded_on_start": false,
+      "memory_context_preview": "",
+      "passed": false,
+      "issues": [
+        "required_terms:0/2",
+        "too_short:0<100",
+        "memory_not_loaded_on_phase2_start"
+      ],
+      "recall_response_preview": "",
+      "phase1": {
+        "start_session": {
+          "ok": false,
+          "status_code": null,
+          "duration_seconds": 0.0,
+          "body": "<urlopen error [Errno 1] Operation not permitted>"
+        },
+        "chat": null,
+        "end_session": null
+      },
+      "phase2": {
+        "start_session": {
+          "ok": false,
+          "status_code": null,
+          "duration_seconds": 0.0,
+          "body": "<urlopen error [Errno 1] Operation not permitted>"
+        },
+        "chat": null,
+        "end_session": null
+      },
+      "memory_after_phase1": {
+        "ok": false,
+        "status_code": null,
+        "duration_seconds": 0.0,
+        "body": "<urlopen error [Errno 1] Operation not permitted>"
+      }
+    }
+  ]
+}

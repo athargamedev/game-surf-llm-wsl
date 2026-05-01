@@ -37,6 +37,8 @@ Reference files to load only when needed:
 - Keep `--batch-size 1` for validation and low-VRAM cards. Increase only after a successful small run.
 - If a script's flags may have changed, run `python <script> --help` or `conda run -n unsloth_env python <script> --help` first.
 - After training, artifact checks, runtime reloads, or memory tests, record evidence with `scripts/track_workflow_run.py` so model changes can be compared across runs.
+- When the user needs to test in a browser, start/restart the servers outside the Codex sandbox; otherwise `localhost` may only be visible inside the sandbox.
+- Update `docs/PROJECT_CONTEXT_INTELLIGENCE.md` when runtime, test, or memory behavior changes.
 
 ## 1. Verify WSL Training Readiness
 
@@ -150,3 +152,5 @@ conda run --no-capture-output -n unsloth_env python \
   --stage memory \
   --player-id workflow_probe
 ```
+
+For `/test-10-player`, a pass requires more than memory creation. Confirm Phase 2 reports both `memory_loaded_on_start=true` and `memory_used_in_response=true`. If an NPC says it cannot remember while Supabase returned memory rows, treat it as runtime prompt/model-use failure, not database failure.
