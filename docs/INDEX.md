@@ -21,6 +21,7 @@
 | [docs/ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, components, data flow |
 | [docs/PIPELINE_REFERENCE.md](PIPELINE_REFERENCE.md) | Full pipeline technical reference |
 | [docs/PROJECT_CONTEXT_INTELLIGENCE.md](PROJECT_CONTEXT_INTELLIGENCE.md) | Durable workflow lessons and current project decisions |
+| [docs/GAMESURF_WORKFLOW_SKILL_GRAPH.mmd](GAMESURF_WORKFLOW_SKILL_GRAPH.mmd) | Visual workflow map connecting stages, gates, skills, runtime, Supabase memory, and feedback loops |
 
 ---
 
@@ -30,6 +31,7 @@
 |----------|---------|
 | [docs/PIPELINE_REFERENCE.md](PIPELINE_REFERENCE.md) | Complete pipeline (generation → training → export) |
 | [docs/NOTEBOOKLM_DATASET_WORKFLOW.md](NOTEBOOKLM_DATASET_WORKFLOW.md) | NotebookLM-backed dataset creation workflow |
+| [docs/GAMESURF_WORKFLOW_SKILL_GRAPH.mmd](GAMESURF_WORKFLOW_SKILL_GRAPH.mmd) | Mermaid graph for agent handoff and end-to-end workflow execution |
 | [docs/test_orchestration_plan.md](test_orchestration_plan.md) | Automated `/test-10-player` memory validation logic |
 | [docs/DIALOGUE_WORKFLOW_REVIEW.md](DIALOGUE_WORKFLOW_REVIEW.md) | Review of dialogue testing/tracking gaps and improvement roadmap |
 | [scripts/run_full_npc_pipeline.py](../scripts/run_full_npc_pipeline.py) | Main orchestrator entry point |

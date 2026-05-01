@@ -11,6 +11,7 @@ This file records durable workflow lessons for Game_Surf NPC dataset generation,
 - Runtime validation uses the shared base GGUF plus per-NPC LoRA adapters.
 - Use `npc_id` for `/chat`, `/reload-model`, `/session/start`, `/session/end`, and memory/debug endpoints.
 - Add every trained NPC to both `chat_interface.html` and `/test-10-player` before considering it ready for user testing.
+- Use `docs/GAMESURF_WORKFLOW_SKILL_GRAPH.mmd` as the visual agent handoff map; it connects skills, workflow stages, validation gates, fallback paths, reports, and the dataset/prompt/memory/training feedback loop.
 
 ## NotebookLM Dataset Lessons
 
