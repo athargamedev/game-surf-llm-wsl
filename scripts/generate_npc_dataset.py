@@ -217,7 +217,7 @@ def research_via_notebooklm(
         print(f"  Creating NotebookLM notebook: '{profile.display_name} Research'...")
         result = _run_nlm_command(
             [
-                "nlm",
+                "notebooklm",
                 "notebook",
                 "create",
                 f"Research: {profile.display_name}",
@@ -234,7 +234,7 @@ def research_via_notebooklm(
         print(f"  Adding source: {url}")
         _run_nlm_command(
             [
-                "nlm",
+                "notebooklm",
                 "source",
                 "add",
                 notebook_id,
@@ -250,7 +250,7 @@ def research_via_notebooklm(
         print(f"  Querying: {query[:60]}...")
         result = _run_nlm_command(
             [
-                "nlm",
+                "notebooklm",
                 "notebook",
                 "query",
                 notebook_id,
@@ -1365,7 +1365,7 @@ def _filter_valid_examples(examples: list[TrainingExample]) -> list[TrainingExam
 
 
 def _run_nlm_command(args: list[str]) -> str:
-    """Run a notebooklm-mcp-cli command and return output."""
+    """Run a notebooklm command and return output."""
     try:
         result = subprocess.run(
             args,
@@ -1374,22 +1374,22 @@ def _run_nlm_command(args: list[str]) -> str:
             timeout=120,
         )
         if result.returncode != 0:
-            print(f"    nlm command failed: {result.stderr[:200]}")
+            print(f"    notebooklm command failed: {result.stderr[:200]}")
             return ""
         return result.stdout
     except FileNotFoundError:
         print(
-            "    ERROR: 'nlm' command not found. Install: uv tool install notebooklm-mcp-cli"
+            "    ERROR: 'notebooklm' command not found. Install: pip install notebooklm-py"
         )
         return ""
     except subprocess.TimeoutExpired:
-        print("    ERROR: nlm command timed out (120s)")
+        print("    ERROR: notebooklm command timed out (120s)")
         return ""
 
 
 def _parse_notebook_id(output: str) -> str | None:
-    """Parse notebook ID from nlm create output."""
-    # nlm typically outputs JSON or structured text with the notebook ID
+    """Parse notebook ID from notebooklm create output."""
+    # notebooklm typically outputs JSON or structured text with the notebook ID
     try:
         data = json.loads(output)
         return data.get("id") or data.get("notebook_id")
@@ -1760,7 +1760,7 @@ def run_for_profile(
             # Try NotebookLM first
             try:
                 result = subprocess.run(
-                    ["nlm", "--version"],
+                    ["notebooklm", "--version"],
                     capture_output=True,
                     text=True,
                     timeout=5,

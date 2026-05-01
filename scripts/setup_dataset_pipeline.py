@@ -37,26 +37,26 @@ REQUIRED_DIRS = [
 
 
 def check_notebooklm_cli() -> bool:
-    """Check if notebooklm-mcp-cli is installed."""
+    """Check if notebooklm CLI is installed."""
     try:
         result = subprocess.run(
-            ["nlm", "--version"],
+            ["notebooklm", "--version"],
             capture_output=True, text=True, timeout=10,
         )
         if result.returncode == 0:
             version = result.stdout.strip()
-            print(f"  [OK] notebooklm-mcp-cli: {version}")
+            print(f"  [OK] notebooklm CLI: {version}")
             return True
         else:
-            print(f"  [X] nlm found but returned error: {result.stderr.strip()[:100]}")
+            print(f"  [X] notebooklm found but returned error: {result.stderr.strip()[:100]}")
             return False
     except FileNotFoundError:
-        print("  [X] notebooklm-mcp-cli: NOT INSTALLED")
-        print("    Install: uv tool install notebooklm-mcp-cli")
-        print("    Or:      pip install notebooklm-mcp-cli")
+        print("  [X] notebooklm CLI: NOT INSTALLED")
+        print("    Install: pip install notebooklm-py")
+        print("    Then run: notebooklm login")
         return False
     except subprocess.TimeoutExpired:
-        print("  [X] nlm: timed out")
+        print("  [X] notebooklm: timed out")
         return False
 
 
@@ -64,7 +64,7 @@ def check_nlm_auth() -> bool:
     """Check if NotebookLM authentication is set up."""
     try:
         result = subprocess.run(
-            ["nlm", "notebook", "list"],
+            ["notebooklm", "list"],
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode == 0:
@@ -72,10 +72,10 @@ def check_nlm_auth() -> bool:
             return True
         else:
             print("  [X] NotebookLM authentication: FAILED")
-            print(f"    Run: nlm login")
+            print(f"    Run: notebooklm login")
             return False
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        print("  [X] Cannot check NotebookLM auth (nlm not available)")
+        print("  [X] Cannot check NotebookLM auth (notebooklm not available)")
         return False
 
 
@@ -237,7 +237,7 @@ def main() -> None:
     elif all_core_ok:
         print("⚠ Core config OK, but NotebookLM is not ready")
         if not nlm_ok:
-            print("  -> Install nlm: uv tool install notebooklm-mcp-cli && nlm login")
+            print("  -> Install: pip install notebooklm-py && notebooklm login")
         if legacy_local_ok:
             print("  -> Legacy local generation is available, but it is not the canonical workflow.")
     else:
