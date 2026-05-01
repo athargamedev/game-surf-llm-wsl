@@ -72,7 +72,7 @@ python scripts/generate_npc_dataset.py --npc <npc_id> --skip-research
 python scripts/generate_npc_dataset.py --npc <npc_id> --async-batch --batch-size 5
 
 # Import existing NotebookLM JSONL
-python scripts/import_notebooklm_jsonl.py --input research/<npc_id>/notebooklm_batch_01.jsonl
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --input research/<npc_id>/notebooklm_batch_01.jsonl
 
 # Run via pipeline orchestrator
 ./run_pipeline.sh --npc <npc_id>
@@ -132,16 +132,16 @@ wc -l research/<npc_id>/notebooklm_batch_*.jsonl
 
 ```bash
 # Standard preparation
-python scripts/prepare_dataset.py --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/
+./run_pipeline.sh --npc <npc_id> --skip-generation --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/
 
 # With quality filtering
-python scripts/prepare_dataset.py --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/ --quality-threshold 0.75
+./run_pipeline.sh --npc <npc_id> --skip-generation --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/ --quality-threshold 0.75
 
 # With deduplication
-python scripts/prepare_dataset.py --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/ --deduplicate --dedup-by response
+./run_pipeline.sh --npc <npc_id> --skip-generation --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/ --deduplicate --dedup-by response
 
 # With stratification
-python scripts/prepare_dataset.py --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/ --stratify-by task_type --val-split 0.1 --test-split 0.1
+./run_pipeline.sh --npc <npc_id> --skip-generation --input research/<npc_id>/raw.jsonl --output datasets/processed/<npc_id>/ --stratify-by task_type --val-split 0.1 --test-split 0.1
 
 # Run as part of pipeline
 ./run_pipeline.sh --npc <npc_id> --skip-generation
@@ -200,26 +200,26 @@ cut -f3 datasets/processed/<npc_id>/train.jsonl | sort | uniq -c | sort -rn
 
 ```bash
 # Standard training (2 epochs)
-python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl
 
 # Small-dataset preset (<500 samples)
-python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl --small-dataset
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl --small-dataset
 
 # Custom hyperparameters
-python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
   --num-train-epochs 3 --batch-size 1 --gradient-accumulation-steps 8 \
   --learning-rate 2e-4 --lora-r 16 --lora-alpha 32
 
 # With validation
-python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
   --val-file datasets/processed/<npc_id>/validation.jsonl
 
 # Resume from checkpoint
-python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
   --resume-from exports/npc_models/<npc_id>/checkpoints/checkpoint-12
 
 # Export to GGUF during training
-python scripts/train_surf_llama.py --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --datasets <dataset_name> --train-file datasets/processed/<npc_id>/train.jsonl \
   --save-gguf q4_k_m
 
 # GPU memory check before starting
@@ -302,13 +302,13 @@ cat exports/npc_models/<npc_id>/checkpoints/training_report.json | jq '.epoch, .
 
 ```bash
 # Export checkpoint to GGUF
-python scripts/convert_lora_to_gguf.py --checkpoint exports/npc_models/<npc_id>/checkpoints/checkpoint-12 --output exports/npc_models/<npc_id>/gguf/
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --checkpoint exports/npc_models/<npc_id>/checkpoints/checkpoint-12 --output exports/npc_models/<npc_id>/gguf/
 
 # Export with quantization
-python scripts/convert_lora_to_gguf.py --checkpoint exports/npc_models/<npc_id>/checkpoints/checkpoint-12 --output exports/npc_models/<npc_id>/gguf/ --quantize q4_k_m
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --checkpoint exports/npc_models/<npc_id>/checkpoints/checkpoint-12 --output exports/npc_models/<npc_id>/gguf/ --quantize q4_k_m
 
 # Sync to Unity runtime
-python scripts/sync_runtime_artifacts.py --models exports/npc_models/<npc_id>/gguf/ --loras exports/npc_models/<npc_id>/lora_adapter/ --lora-name <artifact_key> --manifest exports/npc_models/<npc_id>/npc_model_manifest.json
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --skip-eval --models exports/npc_models/<npc_id>/gguf/ --loras exports/npc_models/<npc_id>/lora_adapter/ --lora-name <artifact_key> --manifest exports/npc_models/<npc_id>/npc_model_manifest.json
 
 # Run via pipeline (includes sync)
 ./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training
@@ -379,14 +379,15 @@ cat exports/npc_models/<npc_id>/npc_model_manifest.json | jq '.npc_key, .artifac
 
 ```bash
 # Start model server for evaluation
-python scripts/llm_integrated_server.py --port 8000 &
-# Or: python scripts/run_chat_server.py
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --skip-sync --skip-eval &
+# Then start server: python scripts/llm_integrated_server.py --port 8000 &
+# Or: # Chat server (use start_servers.sh)
 
 # Judge dataset quality
-python scripts/quality_judge.py --input research/<npc_id>/raw.jsonl --npc <npc_id> --report --max-examples 20
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --skip-sync --input research/<npc_id>/raw.jsonl --npc <npc_id> --report --max-examples 20
 
 # Run NPC evaluation benchmarks
-python scripts/evaluate_model.py --benchmark benchmarks/npc_eval.json --npc-scope <scope>
+./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --skip-sync --benchmark benchmarks/npc_eval.json --npc-scope <scope>
 
 # Test via chat interface
 # Open: http://127.0.0.1:8080/chat_interface.html
@@ -615,7 +616,7 @@ skill(name="task-management")
 | Dataset quality low | Run quality_judge.py, raise threshold |
 | Training diverges | Reduce learning_rate, check dataset format |
 | Sync fails | Check Unity paths, permissions |
-| Server not responding | Restart: `python scripts/run_chat_server.py` |
+| Server not responding | Restart: `# Chat server (use start_servers.sh)` |
 
 ---
 
@@ -652,14 +653,14 @@ CLI → python scripts/generate_npc_dataset.py --npc <npc_id>
 ```
 Delegate → DatasetTrainer  
 Skill → npc-model-tuning
-CLI → python scripts/prepare_dataset.py --input <raw> --output <processed>
+CLI → ./run_pipeline.sh --npc <npc_id> --skip-generation --input <raw> --output <processed>
 ```
 
 ### Phase 3: Training
 ```
 Delegate → DatasetTrainer + BuildAgent
 Skill → npc-model-tuning
-CLI → python scripts/train_surf_llama.py --datasets <name> --train-file <file>
+CLI → ./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --datasets <name> --train-file <file>
 Check → nvidia-smi
 ```
 
@@ -667,14 +668,14 @@ Check → nvidia-smi
 ```
 Delegate → DevOpsSpecialist
 Skill → npc-model-tuning
-CLI → python scripts/convert_lora_to_gguf.py --checkpoint <ckpt> --output <gguf>
+CLI → ./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --checkpoint <ckpt> --output <gguf>
 ```
 
 ### Phase 5: Evaluation
 ```
 Delegate → TestEngineer + CodeReviewer
 Skill → npc-model-tuning
-CLI → python scripts/quality_judge.py --input <file> --npc <npc_id>
+CLI → ./run_pipeline.sh --npc <npc_id> --skip-generation --skip-prep --skip-training --skip-sync --input <file> --npc <npc_id>
 Test → http://127.0.0.1:8080/chat_interface.html
 ```
 

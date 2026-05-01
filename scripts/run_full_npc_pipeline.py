@@ -13,8 +13,35 @@ from npc_pipeline_contract import resolve_npc_spec
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
 
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
+
+# ==============================================================================
+# VRAM PRE-FLIGHT CHECK (consolidated from train_surf_llama.py)
+# ==============================================================================
+
+def check_vram_guard(threshold_gb: float = 3.5) -> None:
+    """Check if enough VRAM is free before starting potentially heavy tasks."""
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            print("[VRAM] CUDA not available, skipping check")
+            return
+        
+        free_bytes, total_bytes = torch.cuda.mem_get_info()
+        free_gb = free_bytes / (1024**3)
+        total_gb = total_bytes / (1024**3)
+        
+        print(f"[VRAM] Free: {free_gb:.2f} GB / Total: {total_gb:.2f} GB")
+        
+        if free_gb < threshold_gb:
+            print(f"!!! WARNING: Low VRAM detected ({free_gb:.2f} GB free) !!!")
+            print("Training or GGUF export may fail with OutOfMemory errors.")
+            print("Please ensure LM Studio, Docker containers, or other GPU apps are closed.")
+            print("Wait 5 seconds to proceed anyway...")
+            import time
+            time.sleep(5)
+    except Exception as e:
+        print(f"[VRAM] Could not verify memory: {e}")
 
 
 def to_workspace_relative(path: Path) -> str:
@@ -137,10 +164,6 @@ def main() -> None:
             "--async-batch",
             "--batch-size",
             args.generation_batch_size,
-            "--llm-url",
-            args.llm_url,
-            "--llm-model",
-            args.llm_model,
             "--seed",
             "3407",
         ]

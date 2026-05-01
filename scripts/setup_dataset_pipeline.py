@@ -26,10 +26,9 @@ ROOT_DIR = Path(__file__).resolve().parents[1]  # Tools/LLM
 
 REQUIRED_DIRS = [
     "configs",
-    "datasets/world",
     "datasets/personas",
     "datasets/processed",
-    "datasets/evals",
+    "benchmarks",
     "research",
     "exports",
 ]

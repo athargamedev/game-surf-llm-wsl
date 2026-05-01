@@ -37,7 +37,7 @@ Currently available (7):
 | NPC ID | Display Name | Subject | Status |
 |-------|-----------|---------|-------|
 | maestro_jazz_instructor | The Maestro | Jazz History | Trained |
-| kosmos_instructor | Professor Kosmos | Greek Mythology | Trained |
+| greek_mythology_instructor | Professor Kosmos | Greek Mythology | Trained |
 | llm_instructor | Professor LoRA | LoRA Fine-tuning | Trained |
 | brazilian_history | Professor Pedro | Brazilian History | Trained |
 | marvel_comics_instructor | MarvelOracle | Marvel Comics | **Trained** ✅ |

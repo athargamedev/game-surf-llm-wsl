@@ -1,17 +1,41 @@
 # Project Context Intelligence
 
-Last updated: 2026-05-01
+Last updated: 2026-05-01 (updated with workflow improvements)
 
 This file records durable workflow lessons for Game_Surf NPC dataset generation, WSL Unsloth training, runtime validation, and Supabase memory testing.
 
 ## Canonical Workflow
 
-- NotebookLM CLI is `notebooklm`, not `nlm`.
+- **Single Entry Point:** Use `./run_pipeline.sh --npc <npc_id>` or `python scripts/run_full_npc_pipeline.py --npc <npc_id>` for ALL pipeline runs.
+- **NotebookLM CLI is `notebooklm`, not `nlm`** (verified: `which notebooklm` works, `nlm` does NOT exist).
 - New NPCs should use NotebookLM-backed source slices, then import/prepare, then WSL-native Unsloth LoRA training.
 - Runtime validation uses the shared base GGUF plus per-NPC LoRA adapters.
 - Use `npc_id` for `/chat`, `/reload-model`, `/session/start`, `/session/end`, and memory/debug endpoints.
 - Add every trained NPC to both `chat_interface.html` and `/test-10-player` before considering it ready for user testing.
 - Use `docs/GAMESURF_WORKFLOW_SKILL_GRAPH.mmd` as the visual agent handoff map; it connects skills, workflow stages, validation gates, fallback paths, reports, and the dataset/prompt/memory/training feedback loop.
+
+## Workflow Improvements (2026-05-01)
+
+### Critical Fixes Applied
+1. **CLI Command Standardization:** All scripts now use `notebooklm` (not `nlm`). Files fixed: `setup_dataset_pipeline.py`, `generate_npc_dataset.py`.
+2. **Import Path Fix:** `npc_pipeline_contract.py` now imports correctly by adding `scripts/` to `sys.path` in `run_full_npc_pipeline.py` and `train_surf_llama.py`.
+3. **Function Consistency:** Renamed `_run_nlm_command` → `_run_notebooklm_command` in `generate_npc_dataset.py`.
+
+### High-Priority Cleanup Completed
+1. **Legacy LM Studio Removal:** Removed `check_legacy_local_llm()` from `setup_dataset_pipeline.py`. Hidden `--llm-url` and `--llm-model` args (SUPPRESS) in pipeline scripts.
+2. **Path Standardization:** Updated all `.codex/skills/` references to `.opencode/skills/` in 5 doc files (NOTEBOOKLM_DATASET_WORKFLOW.md, PIPELINE_REFERENCE.md, NPC_TRAINING_WORKFLOW.md, gamesurf-agent SKILL.md, MAESTRO_DATASET_ROLLOUT_PLAN.md).
+3. **Directory Structure Fix:** Fixed `REQUIRED_DIRS` in `setup_dataset_pipeline.py` (`datasets/world` → `benchmarks`, `datasets/evals` → `benchmarks`).
+4. **Backend Cleanup:** Removed `local` from backend choices in `generate_npc_dataset.py` and `run_full_npc_pipeline.py`.
+
+### Consolidation Improvements
+1. **Single Entry Point:** `run_full_npc_pipeline.py` is now the canonical entry point. Updated NPC_TRAINING_WORKFLOW.md to reference `./run_pipeline.sh` instead of direct script calls.
+2. **VRAM Pre-flight:** Consolidated `check_vram_guard()` into `run_full_npc_pipeline.py` (lines 19-44). Individual scripts no longer need separate VRAM checks at startup.
+3. **NPC ID Standardization:** Updated docs with all 10 NPCs. Note: `kosmos_instructor` (NPC key) → `greek_mythology_instructor` (artifact_key) is INTENTIONAL (artifact_key matches Supabase ID).
+
+### Efficiency Gains
+- **Dead Code Removed:** Legacy LM Studio support completely removed from setup script.
+- **Consolidated Checks:** VRAM check happens once in orchestrator, not duplicated across scripts.
+- **Clear Path Resolution:** `npc_pipeline_contract.py` resolves all paths from NPC profiles (never hardcode paths).
 
 ## NotebookLM Dataset Lessons
 
@@ -94,6 +118,8 @@ bash scripts/start_servers.sh
   - `STUDIO_OPENAI_MODEL=qwen2.5-coder-7b-instruct`
   - `STUDIO_OPENAI_ADVANCED_MODEL=qwen3-8b`
 - Game_Surf local `supabase/config.toml` can declare these values directly plus `custom_image = "localhost/gamesurf/supabase-studio:lmstudio-local"`; keep optional Studio AI fields out of the upstream CLI default template unless golden diff fixtures are updated.
+- Current local integration uses `/mnt/d/GithubRepos/supabasecli/bin/supabase-lmstudio` and `scripts/start_supabase_lmstudio.sh`; start with `-x storage-api,imgproxy,supavisor`, not `pooler`, on the latest CLI fork.
+- Verified integration means the Studio SQL assistant route returns `200 OK` through LM Studio. Structured-output routes still need local-model prompt/model tuning because they can fail with unparseable object responses.
 - Full research and implementation path: `docs/LOCAL_SUPABASE_CUSTOMIZATION_RESEARCH.md`.
 
 ## Solar System Run Snapshot

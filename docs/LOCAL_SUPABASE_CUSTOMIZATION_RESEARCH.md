@@ -207,3 +207,52 @@ supabase start -x storage-api,imgproxy,pooler
 ## Decision
 
 Use the CLI fork for stack orchestration and configuration, but plan on a custom Studio image for the actual LM Studio integration. The first implementation milestone should prove one Studio assistant request completes through `http://host.docker.internal:1234/v1` with a local LM Studio model and no remote OpenAI dependency.
+
+## Implementation Snapshot
+
+Implemented on 2026-05-01:
+
+- Normalized `/mnt/d/GithubRepos/supabasecli` to LF working-tree files:
+  - `core.autocrlf=false`
+  - `core.eol=lf`
+  - `core.safecrlf=warn`
+- Patched the Supabase CLI fork:
+  - `pkg/config/config.go` parses `studio.openai_base_url`, `studio.openai_model`, `studio.openai_advanced_model`, and `studio.custom_image`;
+  - `internal/start/start.go` passes those values to the Studio container;
+  - `internal/utils/docker.go` preserves explicitly registered image names such as `localhost/gamesurf/supabase-studio:lmstudio-local`;
+  - `pkg/config/config_test.go` covers local Studio LLM config parsing and unset optional env values.
+- Built the patched CLI binary:
+  - `/mnt/d/GithubRepos/supabasecli/bin/supabase-lmstudio`
+- Added Game_Surf local Studio AI config in `supabase/config.toml`:
+  - `openai_api_key = "lm-studio"`
+  - `openai_base_url = "http://host.docker.internal:1234/v1"`
+  - `openai_model = "qwen2.5-coder-7b-instruct"`
+  - `openai_advanced_model = "qwen3-8b"`
+  - `custom_image = "localhost/gamesurf/supabase-studio:lmstudio-local"`
+- Added the derived Studio image patch:
+  - `docker/supabase-studio-lmstudio/Dockerfile`
+  - `docker/supabase-studio-lmstudio/patch-studio-lmstudio.js`
+- Built the patched Studio image:
+  - `localhost/gamesurf/supabase-studio:lmstudio-local`
+- Added a helper start script:
+  - `scripts/start_supabase_lmstudio.sh`
+
+Verification:
+
+- `docker ps` shows `supabase_studio_LLM_WSL` running `localhost/gamesurf/supabase-studio:lmstudio-local`.
+- `docker exec supabase_studio_LLM_WSL env` shows:
+  - `OPENAI_API_KEY=lm-studio`
+  - `OPENAI_BASE_URL=http://host.docker.internal:1234/v1`
+  - `STUDIO_OPENAI_BASE_URL=http://host.docker.internal:1234/v1`
+  - `STUDIO_OPENAI_MODEL=qwen2.5-coder-7b-instruct`
+  - `STUDIO_OPENAI_ADVANCED_MODEL=qwen3-8b`
+- The Studio SQL assistant endpoint `/api/ai/sql/generate-v4` returned `200 OK` as a text/event-stream through the local provider.
+- Structured-output helper routes such as feedback classification and SQL title generation still need prompt/model tuning because the local model response was not parseable as the object schema Studio expects.
+
+Known test status:
+
+- Passed:
+  - `go test ./internal/start`
+  - `go test ./config -run 'TestConfigParsing/(studio local llm config|optional studio env config clears unset env values)'`
+- Not clean:
+  - `go test ./internal/utils` has pre-existing WSL/keyring and mocked Docker API failures unrelated to this patch.

@@ -94,6 +94,12 @@ Tools/LLM/datasets/configs/npc_profiles.json
 | `brazilian_history` | Professor Pedro | `brazilian_history_instructor` | History of Brazil, Colonial era, Empire |
 | `marvel_comics_instructor` | MarvelOracle | `marvel_comics_instructor` | Marvel Comics lore, Avengers, X-Men |
 | `kosmos_instructor` | Professor Kosmos | `greek_mythology_instructor` | Greek/Roman Mythology, heroic epics |
+| `solar_system_instructor` | Professor Sol | `solar_system_instructor` | Solar System, planets, space exploration |
+| `llm_instructor` | Professor LoRA | `llm_instructor` | LoRA Fine-tuning, ML concepts |
+| `movies_instructor` | Professor Reel | `movies_instructor` | Cinema/Film Studies |
+| `supabase_instructor` | Supabase Guide | `supabase_instructor` | Supabase, databases, backend |
+| `ai_news_instructor` | AI News Analyst | `ai_news_instructor` | AI news, tech trends |
+| `chemistry_instructor` | Dr. Bond | `chemistry_instructor` | Chemistry, chemical reactions |
 
 ### Adding a New NPC
 

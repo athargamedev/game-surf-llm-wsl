@@ -23,6 +23,7 @@ let patchedFiles = 0
 let providerPatches = 0
 let fetchPatches = 0
 let bodyModelPatches = 0
+let providerOptionsPatches = 0
 
 for (const file of walk(serverDir)) {
   let source = fs.readFileSync(file, 'utf8')
@@ -36,6 +37,11 @@ for (const file of walk(serverDir)) {
       return `model:(process.env.STUDIO_OPENAI_BASE_URL||process.env.OPENAI_BASE_URL?(0,${providerVar}.createOpenAI)({apiKey:process.env.OPENAI_API_KEY||"lm-studio",baseURL:process.env.STUDIO_OPENAI_BASE_URL||process.env.OPENAI_BASE_URL})(${model}):(0,${providerVar}.openai)(${model})),providerOptions`
     }
   )
+
+  source = source.replace(/providerOptions:\{openai:([A-Za-z_$][\w$]*)\}/g, (_match, optionsVar) => {
+    providerOptionsPatches += 1
+    return `providerOptions:{openai:process.env.STUDIO_OPENAI_BASE_URL||process.env.OPENAI_BASE_URL?{}:${optionsVar}}`
+  })
 
   source = source.replace(
     /fetch\("https:\/\/api\.openai\.com\/v1\/chat\/completions"/g,
@@ -64,5 +70,5 @@ if (providerPatches === 0 && fetchPatches === 0) {
 }
 
 console.log(
-  `Patched ${patchedFiles} files: ${providerPatches} provider calls, ${fetchPatches} fetch URLs, ${bodyModelPatches} request body models.`
+  `Patched ${patchedFiles} files: ${providerPatches} provider calls, ${fetchPatches} fetch URLs, ${bodyModelPatches} request body models, ${providerOptionsPatches} provider option blocks.`
 )

@@ -226,8 +226,8 @@ def research_via_notebooklm(
         # Parse notebook ID from output
         notebook_id = _parse_notebook_id(result)
         if not notebook_id:
-            print("  WARNING: Could not create notebook, falling back to local")
-            return research_via_local(profile)
+            print("  WARNING: Could not create notebook, falling back to report-based generation")
+            return research_via_report(profile, Path("dummy"), "") if args.report_path else []
 
     # Step 2: Add source URLs
     for url in profile.notebooklm_sources:
@@ -1603,9 +1603,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--backend",
-        choices=["notebooklm", "local", "auto"],
+        choices=["notebooklm", "auto"],
         default="auto",
-        help="Research backend. 'auto' tries NotebookLM first, falls back to local",
+        help="Research backend (notebooklm recommended, auto-detects)",
     )
     parser.add_argument(
         "--notebook-id",
@@ -1625,13 +1625,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--llm-url",
-        default="http://127.0.0.1:1234",
-        help="Local LLM server URL (LM Studio, llama.cpp, etc.)",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--llm-model",
-        default="local-model",
-        help="Model identifier configured in LM Studio (e.g. qwen3-8b, llama-3.1-8b)",
+        default=None,
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--output-dir",
@@ -1738,7 +1738,7 @@ def run_for_profile(
         return None
 
     if not _preflight_local_llm(args.llm_url, args.llm_model):
-        sys.exit(1)
+        print("  WARNING: Local LLM check failed, continuing anyway...")
 
     # ── Step 1: Research ──────────────────────────────────────────────
     research_notes: list[ResearchNote] = []
@@ -1768,9 +1768,11 @@ def run_for_profile(
                 if result.returncode == 0:
                     backend = "notebooklm"
                 else:
-                    backend = "local"
+                    print("  WARNING: notebooklm not available, falling back to report if available")
+                    backend = "notebooklm"  # Will fail gracefully in research_via_notebooklm
             except (FileNotFoundError, subprocess.TimeoutExpired):
-                backend = "local"
+                print("  WARNING: notebooklm not found, falling back to report if available")
+                backend = "notebooklm"  # Will fail gracefully in research_via_notebooklm
             print(f"  Auto-detected backend: {backend}")
 
         if args.report_path:
@@ -1779,12 +1781,10 @@ def run_for_profile(
                 research_notes = research_via_report(profile, report_path, args.llm_url)
             else:
                 print(f"  ERROR: Report not found at {report_path}")
-                backend = "local"
+                research_notes = []
 
-        if not research_notes and backend == "notebooklm":
+        if not research_notes:
             research_notes = research_via_notebooklm(profile, args.notebook_id)
-        elif not research_notes:
-            research_notes = research_via_local(profile, args.llm_url)
 
         # Save research for reuse
         if research_notes:
