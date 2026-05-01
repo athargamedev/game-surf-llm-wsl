@@ -3,7 +3,7 @@
 Setup & Verify the NPC Dataset Generation Environment
 
 Checks and installs:
-  1. notebooklm-mcp-cli (for NotebookLM research)
+  1. notebooklm-py (for NotebookLM research)
   2. WSL-local training/project prerequisites
   3. NPC profile configs
   4. Directory structure
@@ -11,7 +11,6 @@ Checks and installs:
 Usage:
     python setup_dataset_pipeline.py          # Full check
     python setup_dataset_pipeline.py --install # Auto-install missing deps
-    python setup_dataset_pipeline.py --check-legacy-llm # Optional legacy local generation check
 """
 
 from __future__ import annotations
@@ -60,7 +59,7 @@ def check_notebooklm_cli() -> bool:
         return False
 
 
-def check_nlm_auth() -> bool:
+def check_notebooklm_auth() -> bool:
     """Check if NotebookLM authentication is set up."""
     try:
         result = subprocess.run(
@@ -144,13 +143,13 @@ def check_dataset_schema() -> bool:
 
 
 def install_notebooklm_cli() -> bool:
-    """Attempt to install notebooklm-mcp-cli."""
-    print("\nInstalling notebooklm-mcp-cli...")
-
-    # Try uv first, then pip
+    """Attempt to install notebooklm-py."""
+    print("\nInstalling notebooklm-py...")
+    
+    # Try pip first (notebooklm-py is the correct package name)
     for cmd in [
-        ["uv", "tool", "install", "notebooklm-mcp-cli"],
-        [sys.executable, "-m", "pip", "install", "notebooklm-mcp-cli"],
+        [sys.executable, "-m", "pip", "install", "notebooklm-py"],
+        ["pip", "install", "notebooklm-py"],
     ]:
         try:
             result = subprocess.run(
@@ -162,9 +161,9 @@ def install_notebooklm_cli() -> bool:
                 return True
         except (FileNotFoundError, subprocess.TimeoutExpired):
             continue
-
+    
     print("  [X] Installation failed. Try manually:")
-    print("    uv tool install notebooklm-mcp-cli")
+    print("    pip install notebooklm-py")
     return False
 
 
@@ -176,16 +175,6 @@ def main() -> None:
         "--install",
         action="store_true",
         help="Auto-install missing dependencies",
-    )
-    parser.add_argument(
-        "--llm-url",
-        default="http://127.0.0.1:1234",
-        help="Legacy optional local generation server URL",
-    )
-    parser.add_argument(
-        "--check-legacy-llm",
-        action="store_true",
-        help="Also check the optional legacy OpenAI-compatible generation server",
     )
     args = parser.parse_args()
 
@@ -203,22 +192,16 @@ def main() -> None:
     results["profiles"] = check_profiles()
     results["schema"] = check_dataset_schema()
 
-    print("\n--- NotebookLM MCP CLI ---")
-    results["nlm_cli"] = check_notebooklm_cli()
-    if not results["nlm_cli"] and args.install:
-        results["nlm_cli"] = install_notebooklm_cli()
+    print("\n--- NotebookLM CLI ---")
+    results["notebooklm_cli"] = check_notebooklm_cli()
+    if not results["notebooklm_cli"] and args.install:
+        results["notebooklm_cli"] = install_notebooklm_cli()
 
-    if results["nlm_cli"]:
+    if results["notebooklm_cli"]:
         print("\n--- NotebookLM Authentication ---")
-        results["nlm_auth"] = check_nlm_auth()
+        results["notebooklm_auth"] = check_notebooklm_auth()
     else:
-        results["nlm_auth"] = False
-
-    if args.check_legacy_llm:
-        print("\n--- Legacy Local Generation Server ---")
-        results["legacy_local_llm"] = check_legacy_local_llm(args.llm_url)
-    else:
-        results["legacy_local_llm"] = None
+        results["notebooklm_auth"] = False
 
     # Summary
     print("\n" + "=" * 60)
@@ -226,20 +209,17 @@ def main() -> None:
     print("=" * 60)
 
     all_core_ok = results["dirs"] and results["profiles"] and results["schema"]
-    nlm_ok = results["nlm_cli"] and results["nlm_auth"]
-    legacy_local_ok = results["legacy_local_llm"]
+    notebooklm_ok = results["notebooklm_cli"] and results["notebooklm_auth"]
 
-    if all_core_ok and nlm_ok:
+    if all_core_ok and notebooklm_ok:
         print("[OK] Ready for dataset generation!")
         print("  Backend: NotebookLM datasets + WSL Unsloth training")
         print("\nNext step:")
-        print("  conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help")
+        print("  conda run --no-capture-output -n unsloth_env python .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help")
     elif all_core_ok:
         print("⚠ Core config OK, but NotebookLM is not ready")
-        if not nlm_ok:
+        if not notebooklm_ok:
             print("  -> Install: pip install notebooklm-py && notebooklm login")
-        if legacy_local_ok:
-            print("  -> Legacy local generation is available, but it is not the canonical workflow.")
     else:
         print("[X] Missing core configuration. See errors above.")
 

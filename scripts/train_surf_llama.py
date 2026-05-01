@@ -44,6 +44,11 @@ from datasets import (
 from transformers import DataCollatorForSeq2Seq, TrainerCallback
 from trl import SFTConfig, SFTTrainer
 from unsloth.chat_templates import train_on_responses_only
+# Ensure scripts/ is in path for local imports
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from npc_pipeline_contract import build_model_manifest, resolve_npc_spec, write_model_manifest
 
 ROOT_DIR = Path(__file__).resolve().parents[1]

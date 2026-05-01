@@ -100,7 +100,7 @@ python scripts/training_metrics.py log <npc_id>
 ### Generate Dataset
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc <npc_id> --subject "<subject>" --count 50 --write-prompt-only
 ```
 

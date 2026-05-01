@@ -81,6 +81,21 @@ bash scripts/start_servers.sh
 - Python `/chat` writes `dialogue_turns`; keep `dialogue_sessions.turn_count` synchronized for diagnostics and Edge-function parity.
 - Memory summarization is triggered by ending a dialogue session. Do not add a second direct summarizer unless duplicate `npc_memories` has been ruled out.
 
+## Local Supabase Customization
+
+- Use `LLM_WSL/supabase` as the source of truth for Game_Surf schema, Edge Functions, memory migrations, and local runtime config.
+- Use the Supabase CLI fork at `/mnt/d/GithubRepos/supabasecli` only for local stack orchestration improvements such as image pins, custom Studio image support, and extra Studio env wiring.
+- The current documented Studio AI config only exposes `studio.openai_api_key`; local research found no built-in `openai_base_url` or model override in the CLI fork.
+- Redirecting the Supabase Studio integrated assistant to LM Studio requires a Studio image/provider patch or a local OpenAI-compatible proxy. A CLI-only patch can pass env vars, but it cannot change assistant behavior if the Studio image ignores them.
+- LM Studio is reachable from WSL/Docker at `http://host.docker.internal:1234/v1`; use that instead of `127.0.0.1:1234` for Dockerized Supabase services.
+- Preferred local Studio assistant defaults:
+  - `OPENAI_API_KEY=lm-studio`
+  - `STUDIO_OPENAI_BASE_URL=http://host.docker.internal:1234/v1`
+  - `STUDIO_OPENAI_MODEL=qwen2.5-coder-7b-instruct`
+  - `STUDIO_OPENAI_ADVANCED_MODEL=qwen3-8b`
+- Game_Surf local `supabase/config.toml` can declare these values directly plus `custom_image = "localhost/gamesurf/supabase-studio:lmstudio-local"`; keep optional Studio AI fields out of the upstream CLI default template unless golden diff fixtures are updated.
+- Full research and implementation path: `docs/LOCAL_SUPABASE_CUSTOMIZATION_RESEARCH.md`.
+
 ## Solar System Run Snapshot
 
 - NPC: `solar_system_instructor`

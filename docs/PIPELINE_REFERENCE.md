@@ -162,7 +162,7 @@ The canonical workflow uses NotebookLM to create source-backed JSONL batches und
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --input research/maestro_jazz_instructor/notebooklm_batch_*.jsonl \
   --import \
@@ -326,12 +326,12 @@ Memory validation contract:
 
 ## 5. Skill Interface (Agent Automation)
 
-Use the local Codex skills under `.codex/skills/`:
+Use the local Codex skills under `.opencode/skills/`:
 
 ```bash
 # Dataset creation/import/prepare
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help
 
 # Workflow trace
 conda run --no-capture-output -n unsloth_env python \
@@ -349,7 +349,7 @@ The `npc-model-tuning` skill owns WSL CUDA readiness, Unsloth training, adapter 
 
 # 2. Generate/import NotebookLM-direct batches (preferred path)
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc <npc_key> \
   --input research/<npc_key>/notebooklm_batch_*.jsonl \
   --import \

@@ -4,6 +4,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ensure scripts/ is in path for local imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from npc_pipeline_contract import resolve_npc_spec
 
 # Force UTF-8 output on Windows so Docker/Unsloth emoji don't crash the pipeline.
@@ -86,10 +89,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lora-r", default="16", help="LoRA rank.")
     parser.add_argument("--lora-alpha", default="32", help="LoRA alpha.")
     parser.add_argument("--learning-rate", default="2e-4", help="Learning rate.")
-    parser.add_argument("--generation-backend", choices=["notebooklm", "local", "auto"], default="auto", help="Research backend for dataset generation.")
+    parser.add_argument("--generation-backend", choices=["notebooklm", "auto"], default="auto", help="Research backend for dataset generation (notebooklm recommended).")
     parser.add_argument("--report-path", default=None, help="Markdown research report exported from NotebookLM Deep Research.")
-    parser.add_argument("--llm-url", default="http://127.0.0.1:1234", help="Legacy fallback only: OpenAI-compatible generation server URL for synthetic example generation.")
-    parser.add_argument("--llm-model", default="local-model", help="Legacy fallback only: model ID loaded in the optional generation server.")
+    # Legacy LM Studio args - deprecated, kept for backward compatibility warnings
+    parser.add_argument("--llm-url", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--llm-model", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--generation-batch-size", default="1", help="Async generation batch size.")
     parser.add_argument("--skip-research", action="store_true", help="Reuse existing research notes during generation.")
     parser.add_argument(

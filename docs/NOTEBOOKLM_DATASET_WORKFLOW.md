@@ -58,7 +58,7 @@ cd /root/Game_Surf/Tools/LLM_WSL
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --subject "early New Orleans jazz, Buddy Bolden, King Oliver, Louis Armstrong" \
   --batch-id 1 \
@@ -70,7 +70,7 @@ conda run --no-capture-output -n unsloth_env python \
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --subject "early New Orleans jazz, Buddy Bolden, King Oliver, Louis Armstrong" \
   --batch-id 1 \
@@ -85,7 +85,7 @@ conda run --no-capture-output -n unsloth_env python \
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --input research/maestro_jazz_instructor/notebooklm_batch_*.jsonl \
   --import \
@@ -96,7 +96,7 @@ conda run --no-capture-output -n unsloth_env python \
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc brazilian_history \
   --input research/brazilian_history/notebooklm_batch_*.jsonl \
   --import \
@@ -113,7 +113,7 @@ Result snapshot:
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --input research/maestro_jazz_instructor/notebooklm_batch_*.jsonl \
   --import \
@@ -209,5 +209,5 @@ Tips:
 ## References
 
 - Prompt template: `references/notebooklm_prompt.md`
-- Workflow script: `.codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py`
+- Workflow script: `.opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py`
 - Audit command: `python scripts/audit_dataset_workflow.py --format markdown --output docs/dataset_workflow_audit.md`

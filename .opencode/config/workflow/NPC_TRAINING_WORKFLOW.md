@@ -56,7 +56,7 @@ This manifest maps ALL available OpenCode agents, subagents, skills, tools, MCP 
 ```bash
 # Preferred: import existing NotebookLM-direct batches
 conda run --no-capture-output -n unsloth_env python \
-  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc <npc_id> \
   --input research/<npc_id>/notebooklm_batch_*.jsonl \
   --import \
@@ -474,12 +474,12 @@ supabase get-logs --service auth
 | **notebooklm** | `~/clone/.claude/skills/notebooklm/SKILL.md` | NotebookLM full API |
 | **notebooklm-npc-datasets** | `~/clone/.claude/skills/notebooklm-npc-datasets/SKILL.md` | Dataset automation |
 
-### Project skills (from .codex/skills)
+### Project skills (from .opencode/skills)
 
 | Skill | Location | Purpose |
 |-------|----------|---------|
-| **notebooklm-npc-datasets** | `.codex/skills/notebooklm-npc-datasets/SKILL.md` | Project-specific dataset automation |
-| **npc-model-tuning** | `.codex/skills/npc-model-tuning/SKILL.md` | Full NPC model workflow |
+| **notebooklm-npc-datasets** | `.opencode/skills/notebooklm-npc-datasets/SKILL.md` | Project-specific dataset automation |
+| **npc-model-tuning** | `.opencode/skills/npc-model-tuning/SKILL.md` | Full NPC model workflow |
 
 ### OpenCode skills (from .opencode/skills)
 

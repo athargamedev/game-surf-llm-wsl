@@ -12,3 +12,6 @@ unsloth_compiled_cache/
 
 # Generated workflow trace reports
 reports/workflow_runs/
+
+# Local Supabase database backups
+backups/supabase/

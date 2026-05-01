@@ -9,7 +9,7 @@ Automated workflow that:
   4. Outputs JSONL files matching the Game_Surf dataset schema
 
 Supports two research backends:
-  - "notebooklm" : Uses notebooklm-mcp-cli to query a NotebookLM notebook
+    - "notebooklm" : Uses notebooklm CLI to query a NotebookLM notebook
   - "local"      : Uses a local LLM (LM Studio / llama.cpp) to generate
                     research and dialogue from the profile alone
 
@@ -202,7 +202,7 @@ def research_via_notebooklm(
     notebook_id: str | None = None,
 ) -> list[ResearchNote]:
     """
-    Use notebooklm-mcp-cli to research the NPC's subject domain.
+    Use notebooklm CLI to research the NPC's subject domain.
 
     Workflow:
       1. Create notebook (or reuse existing)
@@ -215,7 +215,7 @@ def research_via_notebooklm(
     # Step 1: Create or select notebook
     if not notebook_id:
         print(f"  Creating NotebookLM notebook: '{profile.display_name} Research'...")
-        result = _run_nlm_command(
+        result = _run_notebooklm_command(
             [
                 "notebooklm",
                 "notebook",
@@ -232,7 +232,7 @@ def research_via_notebooklm(
     # Step 2: Add source URLs
     for url in profile.notebooklm_sources:
         print(f"  Adding source: {url}")
-        _run_nlm_command(
+        _run_notebooklm_command(
             [
                 "notebooklm",
                 "source",
@@ -248,7 +248,7 @@ def research_via_notebooklm(
     # Step 3: Query for domain knowledge
     for query in profile.research_queries:
         print(f"  Querying: {query[:60]}...")
-        result = _run_nlm_command(
+        result = _run_notebooklm_command(
             [
                 "notebooklm",
                 "notebook",
@@ -1364,7 +1364,7 @@ def _filter_valid_examples(examples: list[TrainingExample]) -> list[TrainingExam
     return valid
 
 
-def _run_nlm_command(args: list[str]) -> str:
+def _run_notebooklm_command(args: list[str]) -> str:
     """Run a notebooklm command and return output."""
     try:
         result = subprocess.run(
