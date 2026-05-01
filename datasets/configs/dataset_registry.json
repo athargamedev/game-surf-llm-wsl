@@ -101,6 +101,17 @@
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - MarvelOracle"
+    },
+    {
+      "name": "solar_system_dataset",
+      "path": "datasets/personas/solar_system_instructor/solar_system_dataset.jsonl",
+      "task_type": "mixed",
+      "npc_scope": "instructor",
+      "format": "chatml",
+      "sample_count": 49,
+      "weight": 1.0,
+      "source_kind": "notebooklm_direct",
+      "_note": "Imported from NotebookLM direct JSONL - Professor Sol"
     }
   ]
 }

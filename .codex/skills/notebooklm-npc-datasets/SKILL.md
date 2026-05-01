@@ -115,6 +115,7 @@ conda run --no-capture-output -n unsloth_env python \
    - `conda run --no-capture-output -n unsloth_env python -c "import torch; print(torch.cuda.is_available(), torch.cuda.device_count())"`
    - `supabase status -o env` if Supabase state matters.
    - `notebooklm list` if using automated NotebookLM.
+   - `notebooklm ask --help` before scripting if the CLI was recently updated.
 2. Generate or query a NotebookLM direct JSONL batch with a concrete subject.
 3. Run importer dry-run first. Healthy result should have high `Valid unique`, low `Duplicates`, and `Invalid: 0`.
 4. Import for real only after dry-run succeeds.

@@ -1,0 +1,27 @@
+{
+  "npc": "solar_system_instructor",
+  "inputs": [
+    "research/solar_system_instructor/notebooklm_batch_03.jsonl",
+    "research/solar_system_instructor/notebooklm_batch_04.jsonl",
+    "research/solar_system_instructor/notebooklm_batch_05.jsonl",
+    "research/solar_system_instructor/notebooklm_batch_06.jsonl",
+    "research/solar_system_instructor/notebooklm_batch_07.jsonl"
+  ],
+  "input_records": 50,
+  "valid_unique": 49,
+  "duplicates": 0,
+  "duplicate_users": 1,
+  "duplicate_assistants": 0,
+  "invalid": 1,
+  "average_quality": 0.887,
+  "task_distribution": {
+    "quiz": 25,
+    "teaching": 24
+  },
+  "quality_signals": {
+    "assistant_over_3_sentences": 8
+  },
+  "sample_errors": [
+    "record 42: duplicate user message"
+  ]
+}

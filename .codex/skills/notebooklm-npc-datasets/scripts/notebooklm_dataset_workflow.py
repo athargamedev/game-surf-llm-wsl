@@ -73,9 +73,9 @@ def coverage_plan(profile: dict[str, Any], subject: str, count: int) -> str:
     buckets = weighted_counts(
         count,
         [
-            ("core teaching answers about the batch subject", 0.30),
-            ("specific figures, places, dates, events, or named concepts", 0.20),
-            ("short quiz/check-understanding turns", 0.20),
+            ("core teaching answers about the batch subject", 0.26),
+            ("specific objects, places, dates, missions, measurements, or named concepts", 0.22),
+            ("short quiz/check-understanding turns with one expected answer", 0.22),
             ("memory-aware follow-ups that refer to previous learning", 0.20),
             ("misconception correction or concrete comparisons", 0.10),
         ],
@@ -111,6 +111,9 @@ Memory-aware user turn patterns:
 
 
 def prompt_for(npc_key: str, profile: dict[str, Any], subject: str, count: int) -> str:
+    if count <= 10:
+        return compact_prompt_for(npc_key, profile, subject, count)
+
     personality = profile.get("personality", {})
     rules = " ".join(profile.get("voice_rules", [])[:4]) or "Stay concise and in character."
     coverage = coverage_plan(profile, subject, count)
@@ -126,6 +129,7 @@ Use NotebookLM as a source-aware planner before writing:
 Output format:
 - JSONL only.
 - One valid JSON object per line.
+- Compact structure: no wrapper object, no array, no nested strings containing JSONL.
 - No Markdown.
 - No numbering.
 - No explanation before or after.
@@ -144,6 +148,7 @@ NPC:
 - tone: {personality.get('tone', 'warm and clear')}
 - speaking style: {personality.get('speaking_style', 'concise and in character')}
 - answer length: 1-3 sentences
+- target assistant length: 20-55 words
 - never mention being an AI, model, dataset, prompt, or training example
 
 {coverage}
@@ -171,6 +176,10 @@ Content requirements:
 - Avoid abstract/generic prompts.
 - Avoid duplicate user questions.
 - Avoid duplicate assistant answers.
+- Vary the first 3 words of assistant answers; avoid repeated openers like "Great question" or "Sure".
+- Prefer one teachable fact plus one useful comparison, not broad summaries.
+- For quiz examples, ask one clear question and make the assistant give feedback plus the correct answer in 1-2 sentences.
+- For memory-aware examples, let the user mention prior learning; keep the system memory slot literal and empty.
 - Include both teaching and quiz examples.
 - Include some user questions that refer to previous learning, such as "Last time you told me..."
 - Make the assistant answer useful even when the dynamic memory slot is empty.
@@ -190,6 +199,43 @@ Pre-output checklist:
 - All factual names, dates, places, and claims are grounded in the loaded sources.
 
 Return exactly {count} JSONL lines.
+"""
+
+
+def compact_prompt_for(npc_key: str, profile: dict[str, Any], subject: str, count: int) -> str:
+    personality = profile.get("personality", {})
+    rules = " ".join(profile.get("voice_rules", [])[:4]) or "Stay concise and in character."
+    knowledge = "; ".join(str(item) for item in profile.get("domain_knowledge", [])[:8])
+    memory_samples = "; ".join(str(item) for item in profile.get("memory_context_samples", [])[:4])
+    return f"""Return exactly {count} Game_Surf NPC training examples as JSONL only.
+
+No Markdown, no explanation, no citations like [1], no wrapper object, no array.
+Each physical line must be one JSON object with:
+{{"messages":[{{"role":"system","content":"..."}},{{"role":"user","content":"..."}},{{"role":"assistant","content":"..."}}],"metadata":{{"npc_scope":"{profile.get('npc_scope', 'instructor')}","task_type":"teaching","source_kind":"notebooklm_direct","quality":0.9,"npc_key":"{npc_key}"}}}}
+
+NPC: {profile.get('display_name', npc_key)}
+Subject: {subject}
+Style: {personality.get('tone', 'clear and educational')}; {personality.get('speaking_style', 'concise and in character')}
+System content must exactly follow this pattern, with the memory slot included once:
+You are {profile.get('display_name', npc_key)}. [MEMORY_CONTEXT: {{player_memory_summary}}] Subject: {subject}. Style: {personality.get('tone', 'clear and educational')}; {personality.get('speaking_style', 'concise and in character')}. Rules: {rules} Max 3 sentences. Stay in character.
+
+Critical memory rule:
+- Copy `[MEMORY_CONTEXT: {{player_memory_summary}}]` literally.
+- Do not replace it with None.
+- Do not insert a real learner memory into the system message.
+- Put prior-learning references only in the user message.
+
+Coverage:
+- About half teaching and half quiz.
+- Include at least 2 memory-aware user turns using patterns like: {memory_samples}
+- Cover concrete source-grounded facts from: {knowledge}
+- For quiz examples, the user asks one clear question and the assistant gives brief feedback plus the correct answer.
+- Assistant answers must be 20-50 words, 1-2 sentences, varied openings, no "Great question" repetition.
+- Assistant answers must not ask a follow-up question.
+- Do not mention AI, model, dataset, prompt, system prompt, training example, or citations.
+- Do not duplicate user questions or assistant answers.
+
+Use only facts grounded in the loaded NotebookLM sources. Return exactly {count} JSONL lines.
 """
 
 
@@ -262,7 +308,8 @@ def strip_to_jsonl(text: str) -> str:
                 except json.JSONDecodeError:
                     current = []
                     continue
-                objects.append(json.dumps(parsed, ensure_ascii=False))
+                if isinstance(parsed, dict) and isinstance(parsed.get("messages"), list):
+                    objects.append(json.dumps(parsed, ensure_ascii=False))
                 current = []
 
     return "\n".join(objects) + ("\n" if objects else "")
@@ -312,7 +359,15 @@ def main() -> int:
     if args.run_notebooklm:
         if not args.notebook_id:
             raise SystemExit("--run-notebooklm requires --notebook-id for deterministic automation.")
-        result = run([args.notebooklm_bin, "ask", "--json", "--notebook", args.notebook_id, prompt], check=True)
+        run([args.notebooklm_bin, "clear"], check=False)
+        result = run([
+            args.notebooklm_bin,
+            "ask",
+            prompt,
+            "--notebook",
+            args.notebook_id,
+            "--json",
+        ], check=True)
         raw_response_path.write_text(result.stdout, encoding="utf-8")
         jsonl = strip_to_jsonl(result.stdout)
         if not jsonl:

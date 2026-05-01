@@ -89,6 +89,16 @@ TEST_PLAYER_DELAY_SECONDS = float(os.environ.get("TEST_PLAYER_DELAY_SECONDS", "4
 TEST_NPC_SWITCH_DELAY_SECONDS = float(os.environ.get("TEST_NPC_SWITCH_DELAY_SECONDS", "8"))
 TEST_PHASE_MEMORY_DELAY_SECONDS = float(os.environ.get("TEST_PHASE_MEMORY_DELAY_SECONDS", "35"))
 MEMORY_SLOT = "[MEMORY_CONTEXT: {player_memory_summary}]"
+TEST_NPC_IDS = [
+    "ai_news_instructor",
+    "maestro_jazz_instructor",
+    "llm_instructor",
+    "marvel_comics_instructor",
+    "supabase_instructor",
+    "kosmos_instructor",
+    "brazilian_history_instructor",
+    "solar_system_instructor",
+]
 
 supabase_client: Client | None = None
 supabase_wrapper: SupabaseClient | None = None
@@ -623,9 +633,19 @@ def load_player_context(player_id: str, npc_id: str, current_message: str = "") 
 
 def apply_memory_slot(system_prompt: str, player_id: str, npc_id: str) -> str:
     player_memory_summary = load_player_context(player_id, npc_id)
+    if player_memory_summary != "No saved player memory.":
+        memory_block = (
+            f"[MEMORY_CONTEXT]\n{player_memory_summary}\n\n"
+            "[MEMORY_RULE]\n"
+            "Use Recent NPC Memories as player-specific context. If the player asks "
+            "about a previous or last conversation, answer from this memory and do "
+            "not claim you have no memory."
+        )
+    else:
+        memory_block = "[MEMORY_CONTEXT]\nNo saved player memory."
     if MEMORY_SLOT in system_prompt:
-        return system_prompt.replace(MEMORY_SLOT, f"[MEMORY_CONTEXT]\n{player_memory_summary}")
-    return f"{system_prompt}\n[MEMORY_CONTEXT]\n{player_memory_summary}"
+        return system_prompt.replace(MEMORY_SLOT, memory_block)
+    return f"{system_prompt}\n{memory_block}"
 
 
 def enqueue_memory_embedding_job(player_id: str, npc_id: str, session_id: str) -> dict:
@@ -659,6 +679,25 @@ def enqueue_memory_embedding_job(player_id: str, npc_id: str, session_id: str) -
         error_msg = str(exc)
         print(f"[ERROR] Exception enqueuing memory: {error_msg}")
         return {"status": "error", "reason": "exception", "detail": error_msg}
+
+
+def refresh_dialogue_session_turn_count(session_id: str | None) -> None:
+    """Keep dialogue_sessions.turn_count in sync for Python-server writes."""
+    if not session_id or supabase_client is None:
+        return
+
+    try:
+        count_resp = (
+            supabase_client.table("dialogue_turns")
+            .select("turn_id", count="exact")  # type: ignore
+            .eq("session_id", session_id)
+            .execute()
+        )
+        supabase_client.table("dialogue_sessions").update({
+            "turn_count": count_resp.count or 0,
+        }).eq("session_id", session_id).execute()
+    except Exception as exc:
+        print(f"Failed to refresh turn_count for session {session_id}: {exc}")
 
 
 def enqueue_graph_rebuild_job(
@@ -721,11 +760,67 @@ _DIALOGUE_LEAK_PATTERNS = [
     re.compile(r"(?is)^\s*PLAYER\s*:", re.IGNORECASE),
     re.compile(r"(?is)^\s*NPC\s*:", re.IGNORECASE),
 ]
+_MEMORY_RECALL_PATTERN = re.compile(
+    r"\b(remember|recall|last conversation|previous conversation|talked about|what did we discuss)\b",
+    re.IGNORECASE,
+)
+_MEMORY_DENIAL_PATTERN = re.compile(
+    r"\b("
+    r"i do not recall|i don't recall|i dont recall|"
+    r"i do not remember|i don't remember|i dont remember|"
+    r"no memory|no recollection|can't recall|cannot recall|"
+    r"do not have any recollection|don't have any recollection|"
+    r"memory is limited"
+    r")\b",
+    re.IGNORECASE,
+)
+_MEMORY_KEYWORD_STOPWORDS = {
+    "player", "npc", "tell", "about", "that", "this", "with", "from", "they",
+    "were", "conversation", "previous", "last", "subject", "more", "what",
+    "when", "where", "your", "their", "there", "have", "been", "into",
+}
 
 
 def _has_dialogue_leak(text: str) -> bool:
     """Check if the NPC response contains self-generated dialogue turns."""
     return any(pattern.search(text) for pattern in _DIALOGUE_LEAK_PATTERNS)
+
+
+def _is_memory_recall_question(text: str) -> bool:
+    return bool(_MEMORY_RECALL_PATTERN.search(text or ""))
+
+
+def _response_denies_memory(text: str) -> bool:
+    return bool(_MEMORY_DENIAL_PATTERN.search(text or ""))
+
+
+def _system_prompt_has_saved_memory(system_prompt: str) -> bool:
+    return "Recent NPC Memories:" in system_prompt and "No saved player memory." not in system_prompt
+
+
+def _memory_keywords(text: str) -> set[str]:
+    return {
+        word
+        for word in extract_keywords(text)
+        if word not in _MEMORY_KEYWORD_STOPWORDS and not word.isdigit()
+    }
+
+
+def response_uses_memory(memory_context: str | None, user_message: str, npc_response: str) -> tuple[bool | None, str]:
+    """Return whether a recall answer used loaded memory, plus a short reason."""
+    if not _is_memory_recall_question(user_message):
+        return None, "not_recall_question"
+    if not memory_context:
+        return False, "no_memory_loaded"
+    if _response_denies_memory(npc_response):
+        return False, "denied_memory"
+
+    memory_terms = _memory_keywords(memory_context)
+    response_terms = _memory_keywords(npc_response)
+    overlap = memory_terms & response_terms
+    if overlap:
+        return True, "used_memory_terms:" + ",".join(sorted(list(overlap))[:5])
+    return False, "no_memory_overlap"
 
 
 def run_direct_chat(session: DirectNpcChatSession, user_message: str) -> str:
@@ -751,6 +846,25 @@ def run_direct_chat(session: DirectNpcChatSession, user_message: str) -> str:
             ),
         )
         retry_response = Settings.llm.chat(strict_messages)
+        npc_text = clean_npc_response(extract_chat_text(retry_response))
+
+    if (
+        _is_memory_recall_question(user_message)
+        and _system_prompt_has_saved_memory(session.system_prompt)
+        and _response_denies_memory(npc_text)
+    ):
+        print(f"[WARN] Memory denial despite loaded context, retrying: {npc_text[:80]!r}")
+        memory_messages = list(messages)
+        memory_messages[-1] = ChatMessage(
+            role=MessageRole.USER,
+            content=(
+                "The MEMORY_CONTEXT above contains the player's prior conversation. "
+                "Answer the user's recall request from that memory. Do not say you "
+                "lack memory.\n\nUser request: "
+                + user_message
+            ),
+        )
+        retry_response = Settings.llm.chat(memory_messages)
         npc_text = clean_npc_response(extract_chat_text(retry_response))
 
     session.history.append(ChatMessage(role=MessageRole.USER, content=user_message))
@@ -1015,6 +1129,7 @@ def chat(request: ChatRequest) -> ChatResponse:
                             "npc": npc_text,
                         }),
                     }).execute()
+                    refresh_dialogue_session_turn_count(session_id)
                 print(f"Saved turn for session {session_id}")
             except Exception as exc:
                 print(f"Supabase write error: {exc}")
@@ -1089,6 +1204,7 @@ async def chat_stream(request: ChatRequest):
                                 "npc": npc_text,
                             }),
                         }).execute()
+                        refresh_dialogue_session_turn_count(session_id)
                     print(f"Saved turn for session {session_id}")
                 except Exception as exc:
                     print(f"Supabase write error: {exc}")
@@ -1987,6 +2103,23 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                     </div>
                 </div>
 
+                <div class="npc-card enabled" id="npc-card-solar_system_instructor">
+                    <div class="npc-header">
+                        <input type="checkbox" id="enable-solar_system_instructor" value="solar_system_instructor" checked>
+                        <label for="enable-solar_system_instructor">🪐 Professor Sol</label>
+                    </div>
+                    <div class="npc-fields active" id="fields-solar_system_instructor">
+                        <div class="form-group">
+                            <label>Message 1</label>
+                            <textarea id="msg1-solar_system_instructor">Tell me about the Solar System.</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Message 2</label>
+                            <textarea id="msg2-solar_system_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="npc-card enabled" id="npc-card-brazilian_history_instructor">
                     <div class="npc-header">
                         <input type="checkbox" id="enable-brazilian_history_instructor" value="brazilian_history_instructor" checked>
@@ -2075,6 +2208,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
         const form = document.getElementById('testForm');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
+        const testNpcIds = ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor', 'brazilian_history_instructor', 'solar_system_instructor'];
         
         let pollInterval;
         
@@ -2083,7 +2217,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
             
             // Build NPCs config
             const npcs = [];
-            ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor', 'brazilian_history_instructor'].forEach(npc => {
+            testNpcIds.forEach(npc => {
                 const checkbox = document.getElementById('enable-' + npc);
                 if (checkbox && checkbox.checked) {
                     const msg1 = document.getElementById('msg1-' + npc).value;
@@ -2140,7 +2274,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
         });
         
         // NPC checkbox toggle
-        ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor', 'brazilian_history_instructor'].forEach(npc => {
+        testNpcIds.forEach(npc => {
             const checkbox = document.getElementById('enable-' + npc);
             const card = document.getElementById('npc-card-' + npc);
             const fields = document.getElementById('fields-' + npc);
@@ -2163,6 +2297,16 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
         
         function startPolling() {
             pollInterval = setInterval(pollStatus, 1000);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[ch]));
         }
         
         async function pollStatus() {
@@ -2197,7 +2341,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                     (state.current_npc || '') + ' p' + current;
             }
             
-            document.getElementById('progressFill').style.width = (current / total * 100) + '%';
+            document.getElementById('progressFill').style.width = (results.length / Math.max(total, 1) * 100) + '%';
             document.getElementById('currentPlayer').textContent = state.current_npc ? state.current_npc + ' (' + current + ')' : '--';
             document.getElementById('completed').textContent = results.length + '/' + total;
             
@@ -2216,15 +2360,15 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                 const log = document.getElementById('log');
                 const entries = [
                     '<div class="log-entry"><span class="log-time">[' + new Date().toLocaleTimeString() + ']</span> ' +
-                    '<span class="log-player">' + last_update.player_id + '</span>: ' +
-                    '<span class="log-message">' + (last_update.last_message || '') + '</span></div>'
+                    '<span class="log-player">' + escapeHtml(last_update.player_id) + '</span>: ' +
+                    '<span class="log-message">' + escapeHtml(last_update.last_message || '') + '</span></div>'
                 ];
                 
                 if (last_update.last_response) {
                     const respText = last_update.last_response.substring(0, 100);
                     entries.push(
                         '<div class="log-entry"><span class="log-time">--></span> ' +
-                        '<span class="log-response">' + respText + (last_update.last_response.length > 100 ? '...' : '') + '</span></div>'
+                        '<span class="log-response">' + escapeHtml(respText) + (last_update.last_response.length > 100 ? '...' : '') + '</span></div>'
                     );
                 }
                 
@@ -2269,11 +2413,15 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                     extraInfo = '<span style="margin-left: 10px; font-size: 11px; color: #888;">[Phase2: ' + 
                         (r.memory_persistence_verified ? '✓ persist' : '✗ no persist') + ']</span>';
                 }
+                if (r.memory_used_in_response !== undefined && r.memory_used_in_response !== null) {
+                    extraInfo += '<span style="margin-left: 10px; font-size: 11px; color: #888;">[Answer: ' +
+                        (r.memory_used_in_response ? '✓ used memory' : '✗ ignored memory') + ']</span>';
+                }
                 
                 return '<div class="player-row ' + (r.error ? 'error' : '') + '">' +
-                    '<span class="player-num">' + r.player_id.substr(-3) + '</span>' +
-                    '<span class="player-name">' + r.player_name + '</span>' +
-                    '<span class="player-status ' + statusClass + '">' + statusText + '</span>' +
+                    '<span class="player-num">' + escapeHtml(r.player_id.substr(-3)) + '</span>' +
+                    '<span class="player-name">' + escapeHtml((r.phase || 'normal') + ' · ' + r.npc_id + ' · ' + r.player_name) + '</span>' +
+                    '<span class="player-status ' + statusClass + '">' + escapeHtml(statusText) + '</span>' +
                     extraInfo +
                 '</div>';
             }).join('');
@@ -2405,6 +2553,8 @@ _NPC_PROBE_MESSAGES: dict[str, str] = {
     "marvel_comics_instructor": "Who is your favorite Avenger and why?",
     "supabase_instructor": "What is PostgreSQL and why use it?",
     "kosmos_instructor": "Tell me about a Greek god.",
+    "brazilian_history_instructor": "Tell me about an important moment in Brazilian history.",
+    "solar_system_instructor": "Why are the inner planets rocky?",
 }
 
 # Expected name fragments for identity verification
@@ -2416,6 +2566,8 @@ _NPC_NAME_PATTERNS: dict[str, list[str]] = {
     "marvel_comics_instructor": ["marvel", "oracle", "marveloracle"],
     "supabase_instructor": ["supabase"],
     "kosmos_instructor": ["kosmos", "sage", "olympus", "whispers", "cosmos"],
+    "brazilian_history_instructor": ["pedro", "brazil", "brazilian"],
+    "solar_system_instructor": ["sol", "solar system", "planet", "orbit"],
 }
 
 
@@ -2507,8 +2659,7 @@ def probe_npc_identity_sync(npc_id: str) -> Optional[dict]:
 def get_all_npc_lora_status_sync() -> dict:
     """Get LoRA status for all NPCs at once."""
     results = {}
-    for npc_id in ["ai_news_instructor", "maestro_jazz_instructor", "llm_instructor", 
-                   "marvel_comics_instructor", "supabase_instructor", "kosmos_instructor"]:
+    for npc_id in TEST_NPC_IDS:
         try:
             resp = requests.get(f"{BASE_URL}/debug/lora-status/{npc_id}", timeout=5)
             if resp.status_code == 200:
@@ -2635,12 +2786,21 @@ def trigger_graph_rebuild_sync() -> bool:
         return False
 
 
-def run_player_session_thread(player_idx: int, player_id: str, player_name: str, npc_id: str, messages: list[str], fresh_session: bool = False):
+def run_player_session_thread(
+    player_idx: int,
+    player_id: str,
+    player_name: str,
+    npc_id: str,
+    messages: list[str],
+    fresh_session: bool = False,
+    phase_label: str = "normal",
+):
     global test_state
     
     result = {
         "player_id": player_id,
         "player_name": player_name,
+        "phase": phase_label,
         "session_id": None,
         "npc_id": npc_id,
         "messages_sent": messages,
@@ -2649,6 +2809,8 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         "memory_loaded_on_start": False,
         "memory_loaded_on_start_phase2": None,
         "memory_persistence_verified": None,
+        "memory_used_in_response": None,
+        "memory_response_reason": None,
         "memory_retry_attempts": 0,
         "memory_retry_reason": None,
         "memory_quality_reason": None,
@@ -2677,6 +2839,7 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
         # IMPORTANT: Track memory at session start
         memory_summary_at_start = session_resp.get("memory_summary")
         result["memory_loaded_on_start"] = bool(memory_summary_at_start)
+        memory_context_at_start = memory_summary_at_start or ""
         
         # Log what we got
         if memory_summary_at_start:
@@ -2713,6 +2876,14 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                 npc_response = chat_resp.get("npc_response", "")
                 result["responses_received"].append(npc_response)
                 result["turn_count"] += 1
+                if fresh_session and _is_memory_recall_question(msg):
+                    used_memory, memory_reason = response_uses_memory(
+                        memory_context_at_start,
+                        msg,
+                        npc_response,
+                    )
+                    result["memory_used_in_response"] = used_memory
+                    result["memory_response_reason"] = memory_reason
                 set_test_update(last_response=npc_response)
 
                 time.sleep(TEST_MESSAGE_DELAY_SECONDS)
@@ -2773,7 +2944,6 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                 )
                 
                 # For cross-session: validate memory persistence
-                phase = "Phase 2" if fresh_session else "Phase 1"
                 if fresh_session:
                     if not result.get("memory_loaded_on_start"):
                         print(f"[WARN] {player_id}: Phase 2 started but Phase 1 memory NOT loaded!")
@@ -2783,7 +2953,7 @@ def run_player_session_thread(player_idx: int, player_id: str, player_name: str,
                         result["memory_persistence_verified"] = True
                 
                 # Persist result to DB so it survives server restarts
-                _log_test_result(result, phase)
+                _log_test_result(result, phase_label)
 
                 set_test_update(
                     session_status="memory checks complete",
@@ -2810,6 +2980,7 @@ def run_full_test_thread(config: dict):
     global test_state
     
     player_name_base = config.get("player_name", "Player")
+    run_id = config.get("run_id") or time.strftime("%Y%m%d%H%M%S")
     npc_configs = config.get("npcs", [])
     num_players = config.get("num_players", 3)
     cross_session = config.get("cross_session", False)
@@ -2838,6 +3009,7 @@ def run_full_test_thread(config: dict):
             test_state["results"].append({
                 "player_id": "preflight",
                 "player_name": player_name_base,
+                "phase": "preflight",
                 "session_id": None,
                 "npc_id": None,
                 "turn_count": 0,
@@ -2846,6 +3018,8 @@ def run_full_test_thread(config: dict):
                 "history_verified": False,
                 "player_memories_verified": False,
                 "god_memory_verified": False,
+                "memory_used_in_response": None,
+                "memory_response_reason": None,
                 "duration_seconds": 0,
                 "error": "Preflight failed: server healthy but Supabase is not enabled/connected",
             })
@@ -2881,7 +3055,7 @@ def run_full_test_thread(config: dict):
                         break
                     
                     test_state["current_player"] = i
-                    player_id = f"{player_name_base}_{npc_id}_{str(i).zfill(3)}"
+                    player_id = f"{player_name_base}_{run_id}_{npc_id}_{str(i).zfill(3)}"
                     player_name = f"{player_name_base} {i}"
                     
                     # Phase 2: always fresh session (cleared between phases)
@@ -2889,7 +3063,7 @@ def run_full_test_thread(config: dict):
                     
                     thread = threading.Thread(
                         target=run_player_session_thread,
-                        args=(i, player_id, player_name, npc_id, [target_msg], fresh_session)
+                        args=(i, player_id, player_name, npc_id, [target_msg], fresh_session, phase)
                     )
                     thread.start()
                     thread.join()
@@ -2929,12 +3103,12 @@ def run_full_test_thread(config: dict):
                 
                 test_state["current_player"] = i
                 
-                player_id = f"{player_name_base}_{npc_id}_{str(i).zfill(3)}"
+                player_id = f"{player_name_base}_{run_id}_{npc_id}_{str(i).zfill(3)}"
                 player_name = f"{player_name_base} {i}"
                 
                 thread = threading.Thread(
                     target=run_player_session_thread,
-                    args=(i, player_id, player_name, npc_id, messages)
+                    args=(i, player_id, player_name, npc_id, messages, False, "normal")
                 )
                 thread.start()
                 thread.join()
@@ -2967,13 +3141,21 @@ async def api_start_test(config: TestConfig):
     test_state = {
         "running": True,
         "config": config.model_dump(),
+        "run_id": time.strftime("%Y%m%d%H%M%S"),
         "current_player": 0,
+        "current_npc": None,
+        "total_expected": 0,
         "results": [],
         "start_time": int(time.time() * 1000),
         "last_update": None,
+        "phase": "starting",
+        "cross_session": config.cross_session,
     }
     
-    thread = threading.Thread(target=run_full_test_thread, args=(config.model_dump(),))
+    config_dict = config.model_dump()
+    config_dict["run_id"] = test_state["run_id"]
+    test_state["config"] = config_dict
+    thread = threading.Thread(target=run_full_test_thread, args=(config_dict,))
     thread.start()
     
     return {"status": "started", "num_players": config.num_players}
@@ -2996,11 +3178,15 @@ async def api_test_status():
             {
                 "player_id": r["player_id"],
                 "player_name": r["player_name"],
+                "phase": r.get("phase", "normal"),
                 "session_id": r["session_id"][:8] if r.get("session_id") else None,
+                "npc_id": r.get("npc_id"),
                 "session_status": r.get("session_status", r.get("last_message", "")),
                 "turn_count": r["turn_count"],
                 "memory_created": r["memory_created"],
                 "memory_loaded_on_start": r.get("memory_loaded_on_start", False),
+                "memory_used_in_response": r.get("memory_used_in_response"),
+                "memory_response_reason": r.get("memory_response_reason"),
                 "history_verified": r.get("history_verified", False),
                 "player_memories_verified": r.get("player_memories_verified", False),
                 "god_memory_verified": r.get("god_memory_verified", False),
@@ -3014,6 +3200,7 @@ async def api_test_status():
     return {
         "running": test_state["running"],
         "config": test_state.get("config"),
+        "run_id": test_state.get("run_id"),
         "phase": test_state.get("phase", "normal"),
         "cross_session": test_state.get("cross_session", False),
         "current_player": test_state["current_player"],
