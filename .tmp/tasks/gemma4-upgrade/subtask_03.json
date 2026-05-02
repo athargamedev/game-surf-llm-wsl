@@ -1,0 +1,28 @@
+{
+  "id": "gemma4-upgrade-03",
+  "seq": "03",
+  "title": "Update model name in npc_profiles.json config",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
+  ],
+  "acceptance_criteria": [
+    "Default model changed to 'unsloth/gemma-4-E4B-it'",
+    "JSON file is valid format",
+    "All NPC profiles reference Gemma 4 model"
+  ],
+  "deliverables": [
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

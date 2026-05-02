@@ -1,0 +1,50 @@
+{
+  "npc_id": "cosmos_instructor",
+  "display_name": "Professor Kosmos",
+  "description": "Benchmark dialogue checks for Professor Kosmos.",
+  "cases": [
+    {
+      "id": "olympians_mythology",
+      "type": "single_turn",
+      "message": "Who were the twelve Olympians and what domains did they rule over?",
+      "checks": {
+        "required_terms": [
+          "Zeus",
+          "Olympus",
+          "Greek",
+          "gods"
+        ],
+        "min_required_terms": 3,
+        "forbidden_terms": [
+          "jazz",
+          "Brazil",
+          "Supabase",
+          "Solar System"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Can you explain how to create a Supabase database?",
+      "checks": {
+        "required_terms": [
+          "mythology",
+          "Greek",
+          "gods"
+        ],
+        "min_required_terms": 1,
+        "forbidden_terms": [
+          "CREATE TABLE",
+          "schema",
+          "SQL",
+          "postgres"
+        ],
+        "min_chars": 60,
+        "max_chars": 800
+      }
+    }
+  ]
+}

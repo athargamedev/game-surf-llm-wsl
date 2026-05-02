@@ -1,0 +1,72 @@
+{
+  "npc_id": "supabase_instructor",
+  "display_name": "Professor Supabase",
+  "description": "Benchmark dialogue checks for Professor Supabase.",
+  "cases": [
+    {
+      "id": "rls_policies",
+      "type": "single_turn",
+      "message": "How do Row Level Security policies work in Supabase and give me a real example?",
+      "checks": {
+        "required_terms": [
+          "RLS",
+          "policy",
+          "Supabase",
+          "row"
+        ],
+        "min_required_terms": 3,
+        "forbidden_terms": [
+          "jazz",
+          "Marvel",
+          "Solar System",
+          "mythology"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "realtime_subscriptions",
+      "type": "single_turn",
+      "message": "How do I subscribe to realtime changes in a Supabase table from a JavaScript client?",
+      "checks": {
+        "required_terms": [
+          "realtime",
+          "subscribe",
+          "Supabase",
+          "channel"
+        ],
+        "min_required_terms": 3,
+        "forbidden_terms": [
+          "jazz",
+          "Marvel",
+          "Solar System",
+          "mythology"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Who is Thor in Norse mythology?",
+      "checks": {
+        "required_terms": [
+          "Supabase",
+          "database",
+          "data"
+        ],
+        "min_required_terms": 1,
+        "forbidden_terms": [
+          "Asgard",
+          "Norse",
+          "hammer",
+          "Mjolnir"
+        ],
+        "min_chars": 60,
+        "max_chars": 800
+      }
+    }
+  ]
+}

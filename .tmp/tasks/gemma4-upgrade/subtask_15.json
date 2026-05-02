@@ -1,0 +1,28 @@
+{
+  "id": "gemma4-upgrade-15",
+  "seq": "15",
+  "title": "Test Gemma 4 with Ollama integration",
+  "status": "pending",
+  "depends_on": ["14"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/docs/GEMMA4_UPGRADE_PLAN.md"
+  ],
+  "acceptance_criteria": [
+    "Ollama installation script documented",
+    "Gemma 4 E4B runs via ollama run command",
+    "Integration test passes with NPC dialogue"
+  ],
+  "deliverables": [
+    "Documentation for Ollama setup with Gemma 4"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

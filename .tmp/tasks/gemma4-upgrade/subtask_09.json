@@ -1,0 +1,30 @@
+{
+  "id": "gemma4-upgrade-09",
+  "seq": "09",
+  "title": "Implement native function calling with tool definitions",
+  "status": "pending",
+  "depends_on": ["05"],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/train_surf_llama.py",
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py"
+  ],
+  "acceptance_criteria": [
+    "AVAILABLE_TOOLS array defined with check_player_inventory, get_quest_status, spawn_item",
+    "Function calling schema follows Gemma 4 native format",
+    "Tool use integrated into NPC dialogue flow",
+    "Python files pass syntax check"
+  ],
+  "deliverables": [
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

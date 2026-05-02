@@ -1,0 +1,49 @@
+{
+  "npc_id": "ai_news_instructor",
+  "display_name": "AI News Analyst",
+  "description": "Benchmark dialogue checks for AI News Analyst.",
+  "cases": [
+    {
+      "id": "recent_ai_breakthrough",
+      "type": "single_turn",
+      "message": "What is the most significant AI development in the past year and why does it matter?",
+      "checks": {
+        "required_terms": [
+          "AI",
+          "model",
+          "development"
+        ],
+        "min_required_terms": 2,
+        "forbidden_terms": [
+          "jazz",
+          "Brazil",
+          "Marvel",
+          "Solar System"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Can you teach me about the moons of Jupiter?",
+      "checks": {
+        "required_terms": [
+          "AI",
+          "news",
+          "artificial intelligence"
+        ],
+        "min_required_terms": 1,
+        "forbidden_terms": [
+          "Io",
+          "Europa",
+          "Ganymede",
+          "Callisto"
+        ],
+        "min_chars": 60,
+        "max_chars": 800
+      }
+    }
+  ]
+}

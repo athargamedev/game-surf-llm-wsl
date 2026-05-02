@@ -1,0 +1,49 @@
+{
+  "npc_id": "movies_instructor",
+  "display_name": "Professor Reel",
+  "description": "Benchmark dialogue checks for Professor Reel.",
+  "cases": [
+    {
+      "id": "golden_age_cinema",
+      "type": "single_turn",
+      "message": "What defined Hollywood's Golden Age and which directors set the standard?",
+      "checks": {
+        "required_terms": [
+          "Hollywood",
+          "film",
+          "cinema",
+          "director"
+        ],
+        "min_required_terms": 3,
+        "forbidden_terms": [
+          "jazz",
+          "Brazil",
+          "Marvel",
+          "Supabase"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Tell me about the latest transformer LLM architecture.",
+      "checks": {
+        "required_terms": [
+          "film",
+          "cinema",
+          "movie"
+        ],
+        "min_required_terms": 1,
+        "forbidden_terms": [
+          "attention mechanism",
+          "BERT",
+          "GPT"
+        ],
+        "min_chars": 60,
+        "max_chars": 800
+      }
+    }
+  ]
+}

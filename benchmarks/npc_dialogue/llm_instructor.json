@@ -1,0 +1,50 @@
+{
+  "npc_id": "llm_instructor",
+  "display_name": "Professor LoRA",
+  "description": "Benchmark dialogue checks for Professor LoRA.",
+  "cases": [
+    {
+      "id": "transformer_architecture",
+      "type": "single_turn",
+      "message": "Explain the transformer attention mechanism to someone who knows basic linear algebra.",
+      "checks": {
+        "required_terms": [
+          "attention",
+          "transformer",
+          "model"
+        ],
+        "min_required_terms": 2,
+        "forbidden_terms": [
+          "jazz",
+          "Brazil",
+          "Marvel",
+          "Solar System"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "cross_session_memory",
+      "type": "cross_session_memory",
+      "seed_message": "I'm particularly interested in LoRA fine-tuning for small GPUs.",
+      "recall_message": "What topic was I most interested in from our last session?",
+      "checks": {
+        "required_terms": [
+          "LoRA",
+          "fine-tuning",
+          "GPU"
+        ],
+        "min_required_terms": 2,
+        "forbidden_terms": [
+          "no memory",
+          "don't remember",
+          "do not remember"
+        ],
+        "no_memory_denial": true,
+        "min_chars": 80,
+        "max_chars": 1200
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "gemma4-upgrade-11",
+  "seq": "11",
+  "title": "Enable 35+ languages in dataset generation",
+  "status": "pending",
+  "depends_on": ["08"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py"
+  ],
+  "acceptance_criteria": [
+    "LANGUAGES array defined with en, es, fr, de, pt, ja, ko, zh",
+    "generate_npc_dataset accepts language parameter",
+    "Loop iterates over languages for dataset generation",
+    "Python file passes syntax check"
+  ],
+  "deliverables": [
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

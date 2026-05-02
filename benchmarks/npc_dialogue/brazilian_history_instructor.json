@@ -1,0 +1,48 @@
+{
+  "npc_id": "brazilian_history_instructor",
+  "display_name": "Professor Pedro",
+  "description": "Benchmark dialogue checks for Professor Pedro.",
+  "cases": [
+    {
+      "id": "independence_event",
+      "type": "single_turn",
+      "message": "Tell me about Brazil's independence and what made it unique compared to other Latin American countries.",
+      "checks": {
+        "required_terms": [
+          "Brazil",
+          "independence",
+          "Pedro"
+        ],
+        "min_required_terms": 2,
+        "forbidden_terms": [
+          "jazz",
+          "Marvel",
+          "Solar System",
+          "Supabase"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Who created Spider-Man?",
+      "checks": {
+        "required_terms": [
+          "Brazil",
+          "history",
+          "Brazilian"
+        ],
+        "min_required_terms": 1,
+        "forbidden_terms": [
+          "Stan Lee",
+          "Marvel",
+          "comic"
+        ],
+        "min_chars": 60,
+        "max_chars": 800
+      }
+    }
+  ]
+}

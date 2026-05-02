@@ -2,7 +2,7 @@
 """
 Enhanced Game_Surf NPC Dialogue Training Pipeline
 
-Professional fine-tuning pipeline for Llama 3.2 with:
+Professional fine-tuning pipeline for Gemma 4 with:
 - Optimized hyperparameters (based on 2024-2025 Unsloth best practices)
 - Multi-source dataset loading and blending
 - Validation split with loss tracking
@@ -12,7 +12,7 @@ Professional fine-tuning pipeline for Llama 3.2 with:
 - Per-role LoRA variants support
 
 Usage:
-    python train_surf_llama.py --output-dir exports/surf_llama3b
+    python train_surf_llama.py --output-dir exports/surf_gemma4
     python train_surf_llama.py --npc-scope lab_guide --epochs 3
     python train_surf_llama.py --eval-only --benchmark benchmarks/npc_eval.json
 """
@@ -130,7 +130,7 @@ def select_max_seq_length(free_vram_gb: float, configured: int) -> int:
 
 DEFAULT_CONFIG = {
     # Model
-    "model_name": "unsloth/Llama-3.1-8B-Instruct",
+    "model_name": "unsloth/gemma-4-E4B-it",  # Gemma 4 E4B for 50% faster inference on RTX 3060
     "max_seq_length": 2048,  # ↑ from 1024 — better multi-turn dialogue context
     # LoRA (Rank-Stabilized) - Optimized for NPC persona capture
     "lora_r": 32,  # ↑ from 16 — richer persona expression
@@ -574,7 +574,7 @@ def parse_args() -> argparse.Namespace:
     # Output
     parser.add_argument(
         "--output-dir",
-        default="exports/surf_llama3b",
+        default="exports/surf_gemma4",
         help="Output directory",
     )
     parser.add_argument(
@@ -856,7 +856,7 @@ def build_text_dataset(
     if format_name == "chatml":
         # Already in ChatML format
         def format_row(examples):
-            return format_to_chatml(examples, tokenizer, "llama-3")
+            return format_to_chatml(examples, tokenizer, "gemma")
 
         return dataset.map(
             format_row,
@@ -1242,7 +1242,7 @@ def load_model_and_tokenizer(args: argparse.Namespace, max_seq_length: int):
             "Model loading failed on all tiers. Try:\n"
             "  1. Close other GPU apps (LM Studio, Docker, etc.)\n"
             "  2. Reduce max_seq_length\n"
-            "  3. Use a smaller base model (e.g., Llama-3.2-3B)"
+            "  3. Use a smaller base model (e.g., gemma-4-E2B)"
         )
 
 
@@ -1251,7 +1251,7 @@ def _finish_model_setup(model, tokenizer, args):
     import torch
     from unsloth import get_chat_template
     
-    tokenizer = get_chat_template(tokenizer, chat_template="llama-3.2")
+            tokenizer = get_chat_template(tokenizer, chat_template="gemma")
 
     assert tokenizer.pad_token_id is not None, \
         "Tokenizer missing pad_token — set tokenizer.pad_token = tokenizer.eos_token"
@@ -1463,7 +1463,7 @@ def _make_gguf_name(model_name: str, datasets: list[str], method: str) -> str:
     """Build a descriptive GGUF filename.
 
     Format: {base_model}-{datasets}-{quant}.gguf
-    Example: llama-3.2-3b-kai_instructor-q4_k_m.gguf
+    Example: gemma-4-E4B-kai_instructor-q4_k_m.gguf
     """
     # Shorten model name: keep the last path component, strip unsloth/ prefix
     base = model_name.split("/")[-1].lower()
@@ -1643,8 +1643,8 @@ def _find_cached_base_config(model_name: str) -> Path | None:
     cache_root = Path.home() / ".cache" / "huggingface" / "hub"
     candidates = [
         model_name,
-        model_name.replace("Llama-3.2-3B-Instruct", "llama-3.2-3b-instruct"),
-        "unsloth/llama-3.2-3b-instruct",
+        model_name.replace("gemma-4-E2B-it", "llama-3.2-3b-instruct"),
+        "unsloth/gemma-4-e4b-it",
     ]
     for candidate in candidates:
         repo_dir = cache_root / f"models--{candidate.replace('/', '--')}"
@@ -1659,7 +1659,7 @@ def _find_cached_base_config(model_name: str) -> Path | None:
 def _convert_lora_adapter_to_gguf(adapter_dir: Path, model_name: str) -> Path | None:
     """Create the llama.cpp LoRA GGUF used by the WSL test server."""
     output_path = adapter_dir / "adapter_model.gguf"
-    converter = Path("/root/.unsloth/llama.cpp/convert_lora_to_gguf.py")
+    converter = Path("/root/.unsloth/gemma.cpp/convert_lora_to_gguf.py")
     if not converter.exists():
         print(f"WARNING: LoRA GGUF converter not found: {converter}")
         return None
@@ -1679,7 +1679,7 @@ def _convert_lora_adapter_to_gguf(adapter_dir: Path, model_name: str) -> Path | 
     else:
         command.extend(["--base-model-id", model_name])
 
-    print("Converting LoRA adapter to llama.cpp GGUF...")
+    print("Converting LoRA adapter to gemma.cpp GGUF...")
     result = subprocess.run(command, text=True)
     if result.returncode != 0:
         print("WARNING: LoRA GGUF conversion failed. The PEFT adapter was saved, but llama.cpp runtime selection will skip it.")

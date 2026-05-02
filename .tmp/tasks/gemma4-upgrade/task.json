@@ -1,0 +1,32 @@
+{
+  "id": "gemma4-upgrade",
+  "name": "Gemma 4 Upgrade - Llama 3.1 8B to Gemma 4 E4B",
+  "status": "active",
+  "objective": "Upgrade NPC training pipeline from Llama 3.1 8B to Gemma 4 E4B with multimodal, function calling, multilingual, and performance optimization",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/docs/GEMMA4_UPGRADE_PLAN.md",
+    "/root/Game_Surf/Tools/LLM_WSL/AGENTS.md",
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/train_surf_llama.py",
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py",
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/convert_lora_to_gguf.py",
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py",
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
+  ],
+  "exit_criteria": [
+    "All 6 phases from upgrade plan implemented",
+    "Gemma 4 E4B model loads and trains successfully",
+    "Multimodal capabilities (vision + audio) working",
+    "Function calling implemented with tool definitions",
+    "Multilingual support for 35+ languages enabled",
+    "Q4_K_M quantization applied with 50% faster inference",
+    "NVIDIA ecosystem integration tested (Ollama, llama-bench)"
+  ],
+  "subtask_count": 17,
+  "completed_count": 0,
+  "created_at": "2026-05-02T00:00:00Z",
+  "completed_at": null
+}

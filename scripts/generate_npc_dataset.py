@@ -217,8 +217,7 @@ def research_via_notebooklm(
         print(f"  Creating NotebookLM notebook: '{profile.display_name} Research'...")
         result = _run_notebooklm_command(
             [
-                "notebooklm",
-                "notebook",
+                "/root/miniforge3/bin/notebooklm",
                 "create",
                 f"Research: {profile.display_name}",
             ]
@@ -227,19 +226,19 @@ def research_via_notebooklm(
         notebook_id = _parse_notebook_id(result)
         if not notebook_id:
             print("  WARNING: Could not create notebook, falling back to report-based generation")
-            return research_via_report(profile, Path("dummy"), "") if args.report_path else []
+            return []  # no report_path in scope — caller generates from LLM only
 
     # Step 2: Add source URLs
     for url in profile.notebooklm_sources:
         print(f"  Adding source: {url}")
+        # Use this notebook context first
+        _run_notebooklm_command(["/root/miniforge3/bin/notebooklm", "use", notebook_id])
         _run_notebooklm_command(
             [
-                "notebooklm",
+                "/root/miniforge3/bin/notebooklm",
                 "source",
                 "add",
-                notebook_id,
-                "--url",
-                url,
+                "--url", url,
                 "--wait",
             ]
         )
@@ -261,10 +260,8 @@ def research_via_notebooklm(
             print(f"  Querying: {query[:60]}...")
             result = _run_notebooklm_command(
                 [
-                    "notebooklm",
-                    "notebook",
-                    "query",
-                    notebook_id,
+                    "/root/miniforge3/bin/notebooklm",
+                    "ask",
                     query,
                 ]
             )
@@ -1748,6 +1745,20 @@ def run_for_profile(
         print(f"    Total target: ~{sum(task_targets.values())} examples")
         return None
 
+    # Auto-detect LLM backend if not specified
+    if not args.llm_url:
+        # Try Ollama first (no VRAM needed for generation)
+        try:
+            import urllib.request
+            urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
+            args.llm_url = "http://localhost:11434/v1"
+            if not args.llm_model:
+                args.llm_model = "llama3.2:latest"
+            print(f"  [AUTO] Using Ollama: {args.llm_url} model={args.llm_model}")
+        except Exception:
+            # Fall back to LMStudio
+            args.llm_url = "http://localhost:1234/v1"
+            print(f"  [AUTO] Using LMStudio: {args.llm_url}")
     if not _preflight_local_llm(args.llm_url, args.llm_model):
         print("  WARNING: Local LLM check failed, continuing anyway...")
 

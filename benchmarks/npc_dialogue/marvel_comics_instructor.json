@@ -1,0 +1,48 @@
+{
+  "npc_id": "marvel_comics_instructor",
+  "display_name": "MarvelOracle",
+  "description": "Benchmark dialogue checks for MarvelOracle.",
+  "cases": [
+    {
+      "id": "x_men_origins",
+      "type": "single_turn",
+      "message": "Who created the X-Men and what was the original lineup?",
+      "checks": {
+        "required_terms": [
+          "X-Men",
+          "Marvel",
+          "mutant"
+        ],
+        "min_required_terms": 2,
+        "forbidden_terms": [
+          "jazz",
+          "Brazil",
+          "Solar System",
+          "Supabase"
+        ],
+        "min_chars": 100,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Explain Brazilian independence to me.",
+      "checks": {
+        "required_terms": [
+          "Marvel",
+          "comics",
+          "hero"
+        ],
+        "min_required_terms": 1,
+        "forbidden_terms": [
+          "Pedro I",
+          "Dom Pedro",
+          "colony"
+        ],
+        "min_chars": 60,
+        "max_chars": 800
+      }
+    }
+  ]
+}

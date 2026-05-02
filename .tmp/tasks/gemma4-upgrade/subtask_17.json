@@ -1,0 +1,28 @@
+{
+  "id": "gemma4-upgrade-17",
+  "seq": "17",
+  "title": "Document DGX Spark integration option",
+  "status": "pending",
+  "depends_on": ["16"],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/docs/GEMMA4_UPGRADE_PLAN.md"
+  ],
+  "acceptance_criteria": [
+    "DGX Spark integration documented as future option",
+    "Documentation explains scaling benefits",
+    "No code changes required (documentation only)"
+  ],
+  "deliverables": [
+    "DGX Spark integration documentation"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

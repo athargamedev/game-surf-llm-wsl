@@ -1,0 +1,48 @@
+{
+  "npc_id": "maestro_jazz_instructor",
+  "display_name": "The Maestro",
+  "description": "Benchmark dialogue checks for The Maestro.",
+  "cases": [
+    {
+      "id": "bebop_origins",
+      "type": "single_turn",
+      "message": "What made bebop different from swing and who were its pioneers?",
+      "checks": {
+        "required_terms": [
+          "bebop",
+          "swing",
+          "jazz"
+        ],
+        "min_required_terms": 2,
+        "forbidden_terms": [
+          "Marvel",
+          "Brazil",
+          "Solar System",
+          "Supabase"
+        ],
+        "min_chars": 120,
+        "max_chars": 1200
+      }
+    },
+    {
+      "id": "off_topic_redirect",
+      "type": "single_turn",
+      "message": "Can you help me understand how black holes form?",
+      "checks": {
+        "required_terms": [
+          "jazz",
+          "music",
+          "improvisation"
+        ],
+        "min_required_terms": 1,
+        "forbidden_terms": [
+          "stellar",
+          "nebula",
+          "gravity collapse"
+        ],
+        "min_chars": 60,
+        "max_chars": 800
+      }
+    }
+  ]
+}

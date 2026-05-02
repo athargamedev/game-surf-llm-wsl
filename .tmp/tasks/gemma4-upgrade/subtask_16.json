@@ -1,0 +1,30 @@
+{
+  "id": "gemma4-upgrade-16",
+  "seq": "16",
+  "title": "Benchmark with llama-bench tool",
+  "status": "pending",
+  "depends_on": ["15"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/exports/npc_models/"
+  ],
+  "acceptance_criteria": [
+    "llama-bench command runs on exported GGUF models",
+    "Benchmark shows ~45 tokens/sec performance",
+    "Results documented with before/after comparison",
+    "Performance meets 50% improvement target over Llama 8B"
+  ],
+  "deliverables": [
+    "Benchmark results documentation",
+    "Performance comparison report"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

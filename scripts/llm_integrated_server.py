@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from llama_index.core import StorageContext, SimpleDirectoryReader, Settings, VectorStoreIndex, load_index_from_storage
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.llama_cpp import LlamaCPP
+from llama_index.llms.gemma.cpp import LlamaCPP
 from llama_index.core.memory import ChatMemoryBuffer
 from supabase import Client, create_client
 import requests
@@ -61,7 +61,7 @@ load_env_file(TOOLS_LLM_ROOT / ".env")
 
 MODEL_PATH = os.environ.get(
     "MODEL_PATH",
-    "exports/training_test_export/gguf_gguf/llama-3.2-3b-instruct.Q4_K_M.gguf",
+    "exports/training_test_export/gguf_gguf/gemma-4-e2b-instruct.Q4_K_M.gguf",
 )
 BASE_MODEL_PATH = MODEL_PATH
 LORE_DIR = os.environ.get("LORE_DIR", "research/")
@@ -329,7 +329,7 @@ def resolve_lora_adapter_path_for_npc(npc_id: str) -> str | None:
         adapter_file = Path(adapter_dir) / "adapter_model.safetensors"
         if adapter_file.exists():
             print(
-                f"Found PEFT adapter for {npc_id}, but llama.cpp runtime requires "
+                f"Found PEFT adapter for {npc_id}, but gemma.cpp runtime requires "
                 f"a converted adapter_model.gguf: {adapter_file}"
             )
 
@@ -881,7 +881,7 @@ def run_direct_chat(session: DirectNpcChatSession, user_message: str) -> str:
 
 
 def unload_llm_runtime() -> None:
-    """Release the current llama.cpp runtime before loading another LoRA."""
+    """Release the current gemma.cpp runtime before loading another LoRA."""
     try:
         Settings.llm = None
     except Exception:
@@ -1697,7 +1697,7 @@ def _get_gpu_utilization() -> float:
 
 
 def get_gpu_acceleration_status() -> dict:
-    """Check if llama.cpp is actually using GPU acceleration."""
+    """Check if gemma.cpp is actually using GPU acceleration."""
     status = {
         "torch_cuda_available": False,
         "gpu_memory_mb": 0.0,

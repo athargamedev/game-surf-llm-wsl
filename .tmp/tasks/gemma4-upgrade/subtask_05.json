@@ -1,0 +1,31 @@
+{
+  "id": "gemma4-upgrade-05",
+  "seq": "05",
+  "title": "Run smoke test with greek_mythology_instructor NPC",
+  "status": "pending",
+  "depends_on": ["04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/run_full_npc_pipeline.py",
+    "/root/Game_Surf/Tools/LLM_WSL/run_pipeline.sh"
+  ],
+  "acceptance_criteria": [
+    "Pipeline runs successfully with --skip-generation --resume flags",
+    "Gemma 4 E4B model loads without errors",
+    "Training completes with no CUDA out of memory errors",
+    "Output GGUF file created in exports/npc_models/greek_mythology_instructor/"
+  ],
+  "deliverables": [
+    "Test run log showing successful Gemma 4 training",
+    "exports/npc_models/greek_mythology_instructor/adapter_model.gguf"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

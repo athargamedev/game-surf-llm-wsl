@@ -1,0 +1,29 @@
+{
+  "id": "gemma4-upgrade-10",
+  "seq": "10",
+  "title": "Update NPC prompt templates for function calling",
+  "status": "pending",
+  "depends_on": ["09"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
+  ],
+  "acceptance_criteria": [
+    "system_prompt_template includes tool_list placeholder",
+    "Prompt template instructs NPC to use tools when relevant",
+    "JSON file is valid format",
+    "All NPC profiles updated with function calling prompts"
+  ],
+  "deliverables": [
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}
