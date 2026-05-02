@@ -44,6 +44,13 @@ from typing import Any, Optional
 ```
 
 ---
+## Agent Behaviors & Execution Safety
+
+**Process Management (CRITICAL)**:
+- Agents MUST verify and kill orphaned, backgrounded, or failed scripts (using `ps aux | grep`, `pm2 status`, or `pkill`) **before** starting any new long-running task, test, or server. 
+- Never leave background processes running unattended. This prevents silent OOM errors, port conflicts, and resource exhaustion.
+
+---
 
 ## Core Patterns
 

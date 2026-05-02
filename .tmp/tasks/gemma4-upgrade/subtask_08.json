@@ -3,7 +3,7 @@
   "seq": "08",
   "title": "Update dataset generation for multimodal content",
   "status": "pending",
-  "depends_on": ["07"],
+  "depends_on": ["06", "07"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [
@@ -11,16 +11,18 @@
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
   ],
   "reference_files": [
-    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py"
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py",
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
   ],
   "acceptance_criteria": [
-    "Added multimodal examples generation (image+text pairs)",
-    "Added audio interaction examples generation",
-    "Updated NotebookLM prompts for multimodal content",
-    "Python file passes syntax check"
+    "Dataset generation supports image+text pairs",
+    "Audio interaction examples added",
+    "NotebookLM prompts updated for multimodal content",
+    "ChatML format extended for multimodal"
   ],
   "deliverables": [
-    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py"
+    "Updated generate_npc_dataset.py with multimodal support",
+    "Multimodal dataset examples"
   ],
   "agent_id": null,
   "started_at": null,

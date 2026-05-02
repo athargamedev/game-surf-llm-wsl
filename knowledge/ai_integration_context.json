@@ -8,6 +8,10 @@
       "rule": "ALWAYS use host LAN IP (e.g. 192.168.0.x) instead of host.docker.internal for WSL environments."
     },
     {
+      "trigger": "configuring LM Studio for GPU or encountering Flash Attention disabled errors",
+      "rule": "Always explicitly set 'GPU Offload' to 'Max' (not 'Auto') in LM Studio's Hardware settings. If 'Auto' is used, layers spill to the CPU to avoid OOM, which instantly crashes/disables Flash Attention and tanks performance. Use Q4_K_M quantization for Gemma 4 E4B to fit the 6GB RTX 3060 VRAM."
+    },
+    {
       "trigger": "editing supabase/config.toml",
       "rule": "NEVER add 'custom_image' or 'openai_base_url' keys; they break the CLI 2.x parser. Use docker/start-studio-lmstudio.sh instead."
     },
@@ -22,6 +26,10 @@
     {
       "trigger": "stopping or restarting god_memory_worker.py",
       "rule": "The worker has SIGINT/SIGTERM handlers — it will finish its current job before exiting. Use 'pm2 stop god-memory-worker' for graceful shutdown. NEVER kill -9 while the graph rebuild is running."
+    },
+    {
+      "trigger": "executing any background scripts or testing local servers",
+      "rule": "AGENT BEHAVIOR RULE: ALWAYS check for existing/zombie processes first using 'pm2 status', 'ps aux | grep <script_name>', or 'lsof -i :<port>'. You MUST explicitly kill non-useful or failed background processes before starting a new one to prevent port conflicts, memory leaks, and silent failures."
     },
     {
       "trigger": "adding or modifying pgvector indexes",

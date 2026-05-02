@@ -12,16 +12,18 @@
   ],
   "reference_files": [
     "/root/Game_Surf/Tools/LLM_WSL/scripts/train_surf_llama.py",
-    "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py"
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py",
+    "https://blogs.nvidia.com/blog/rtx-ai-garage-open-models-google-gemma-4/"
   ],
   "acceptance_criteria": [
-    "Audio transcription capability documented/implemented",
-    "TTS integration pattern defined for NPC voices",
-    "Supabase audio memory storage approach documented",
-    "Python files pass syntax check"
+    "Gemma 4 audio transcription capabilities enabled",
+    "TTS (Text-to-Speech) integration for NPC voices",
+    "Voice input/output workflow implemented",
+    "Audio memories stored in Supabase"
   ],
   "deliverables": [
-    "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py"
+    "Updated llm_integrated_server.py with audio support",
+    "Audio workflow documentation"
   ],
   "agent_id": null,
   "started_at": null,

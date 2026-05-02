@@ -1251,7 +1251,7 @@ def _finish_model_setup(model, tokenizer, args):
     import torch
     from unsloth import get_chat_template
     
-            tokenizer = get_chat_template(tokenizer, chat_template="gemma")
+    tokenizer = get_chat_template(tokenizer, chat_template="gemma")
 
     assert tokenizer.pad_token_id is not None, \
         "Tokenizer missing pad_token — set tokenizer.pad_token = tokenizer.eos_token"

@@ -1,0 +1,27 @@
+{
+  "format": "chatml",
+  "npc_scope": "instructor",
+  "task_type": "teaching",
+  "total_examples": 200,
+  "splits": {
+    "train": 162,
+    "validation": 18,
+    "test": 20
+  },
+  "report": {
+    "npc_scope_distribution": {
+      "instructor": 200
+    },
+    "task_distribution": {
+      "teaching": 200
+    },
+    "source_distribution": {
+      "notebooklm_direct": 200
+    },
+    "average_user_words": 3.7,
+    "average_assistant_words": 26.0,
+    "unique_user_count": 10,
+    "unique_assistant_count": 10,
+    "memory_slot_rate": 1.0
+  }
+}

@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemma 4 Training Hyperparameters Explorer | GameSurf</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Color Palette */
+            --bg-base: #0f111a;
+            --bg-surface: #1e2130;
+            --bg-surface-hover: #2a2e42;
+            --bg-panel: #161925;
+            --text-primary: #f8f9fc;
+            --text-secondary: #9da3ba;
+            --accent-primary: #6366f1; /* Indigo */
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --accent-secondary: #0ea5e9; /* Light Blue */
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --border-color: rgba(255,255,255,0.08);
+            
+            /* Typography */
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Glassmorphism Background Elements */
+        .bg-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, rgba(15,17,26,0) 70%);
+            border-radius: 50%;
+            z-index: -1;
+            top: -200px;
+            left: -200px;
+            pointer-events: none;
+            filter: blur(80px);
+            animation: pulse-glow 10s infinite alternate ease-in-out;
+        }
+
+        .bg-glow:nth-child(2) {
+            top: auto;
+            bottom: -200px;
+            left: auto;
+            right: -200px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, rgba(15,17,26,0) 70%);
+            animation: pulse-glow 12s infinite alternate-reverse ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(0.8) translate(0, 0); opacity: 0.5; }
+            100% { transform: scale(1.2) translate(50px, 50px); opacity: 0.8; }
+        }
+
+        /* Header */
+        header {
+            padding: 2rem 4rem;
+            background: rgba(22, 25, 37, 0.7);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            font-size: 2rem;
+            background: none;
+            -webkit-text-fill-color: initial;
+        }
+
+        /* Main Layout */
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            padding: 2rem 4rem;
+            max-width: 1800px;
+            margin: 0 auto;
+            flex-grow: 1;
+            width: 100%;
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--bg-panel);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            height: fit-content;
+        }
+
+        .panel-header {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+
+        /* Parameter Grid */
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* Parameter Card */
+        .param-card {
+            background: var(--bg-surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .param-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        .param-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            border-color: rgba(99, 102, 241, 0.3);
+            background: var(--bg-surface-hover);
+        }
+
+        .param-card:hover::before, .param-card.active::before {
+            transform: scaleX(1);
+        }
+
+        .param-card.active {
+            border-color: var(--accent-primary);
+            background: var(--bg-surface-hover);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+        }
+
+        .param-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .param-title {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--accent-secondary);
+        }
+
+        .param-value-display {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            background: rgba(0,0,0,0.3);
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            color: var(--accent-success);
+            font-weight: 600;
+        }
+
+        .param-short-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Sliders & Inputs */
+        .slider-container {
+            position: relative;
+            margin-top: 10px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            margin: 10px 0;
+        }
+
+        input[type="range"]:focus {
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #2a2e42;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 0 10px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Detail Panel (Right Side) */
+        .detail-panel {
+            position: sticky;
+            top: 100px;
+        }
+
+        .detail-title {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent-secondary);
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .detail-description {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        .pros-cons {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .pro-con-box {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            border-left: 4px solid;
+        }
+
+        .pro-box { border-left-color: var(--accent-success); }
+        .con-box { border-left-color: var(--accent-danger); }
+        .vram-box { border-left-color: var(--accent-warning); }
+
+        .box-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pro-box .box-title { color: var(--accent-success); }
+        .con-box .box-title { color: var(--accent-danger); }
+        .vram-box .box-title { color: var(--accent-warning); }
+
+        .box-content {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .code-preview {
+            background: #090a0f;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: #e2e8f0;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-keyword { color: #c678dd; }
+        .code-function { color: #61afef; }
+        .code-string { color: #98c379; }
+        .code-comment { color: #5c6370; font-style: italic; }
+        .code-number { color: #d19a66; }
+
+        /* VRAM Estimator */
+        .vram-estimator {
+            background: linear-gradient(145deg, #1e2130, #161925);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: auto;
+            border: 1px solid var(--accent-primary);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+        }
+
+        .vram-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .vram-title {
+            font-family: var(--font-display);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .vram-value {
+            font-family: var(--font-mono);
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent-warning);
+        }
+
+        .vram-bar-container {
+            height: 8px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .vram-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-success), var(--accent-warning), var(--accent-danger));
+            width: 0%;
+            transition: width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .vram-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Buttons */
+        .btn {
+            background: linear-gradient(135deg, var(--accent-primary), #4f46e5);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-family: var(--font-body);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .detail-panel {
+                position: static;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div class="bg-glow"></div>
+
+    <header>
+        <div class="logo">
+            <span class="logo-icon">🎮</span> GameSurf Gemma 4 Training
+        </div>
+        <button class="btn" id="exportBtn">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+            Export Config
+        </button>
+    </header>
+
+    <div class="container">
+        <!-- Left: Interactive Controls -->
+        <div class="panel">
+            <h2 class="panel-header">Hyperparameter Controls</h2>
+            
+            <div class="param-grid" id="paramGrid">
+                <!-- Cards generated by JS -->
+            </div>
+        </div>
+
+        <!-- Right: Didactic Details & VRAM -->
+        <div class="panel detail-panel">
+            <div id="detailView">
+                <div class="empty-state">
+                    <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-bottom:1rem; opacity:0.5;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <p>Select a hyperparameter on the left to see detailed explanations, trade-offs, and code impacts.</p>
+                </div>
+            </div>
+
+            <div class="vram-estimator">
+                <div class="vram-header">
+                    <div class="vram-title">Est. VRAM Usage (RTX 3060)</div>
+                    <div class="vram-value"><span id="vramValue">2.8</span> GB</div>
+                </div>
+                <div class="vram-bar-container">
+                    <div class="vram-bar" id="vramBar" style="width: 46%;"></div>
+                </div>
+                <div class="vram-labels">
+                    <span>0 GB</span>
+                    <span style="color:var(--accent-warning)">Warning (5GB)</span>
+                    <span style="color:var(--accent-danger)">OOM (6GB)</span>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.8rem;">
+                    *Calculated for Gemma-4-E4B in 4-bit mode. Base size ~2.5GB + LoRA adapters + Context caching.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Knowledge Base for Hyperparameters
+        const params = {
+            rlora: {
+                id: 'rlora',
+                title: 'LoRA Rank (r)',
+                type: 'slider',
+                min: 8, max: 128, step: 8, default: 32,
+                badge: 'Capacity',
+                desc: 'Determines the number of parameters trained. Think of it as the "brain capacity" of the new persona you are injecting.',
+                pros: 'Higher Rank allows the model to learn more complex behaviors, nuanced speech patterns, and deeper character lore.',
+                cons: 'Higher Rank significantly increases VRAM usage, training time, and the final adapter file size (.gguf). Risk of overfitting on small datasets.',
+                vram_impact: 'High: Scales linearly with size. r=32 adds ~150MB, r=128 adds ~600MB.',
+                code: `model = FastLanguageModel.get_peft_model(
+    model,
+    r = <span class="code-number" id="code-rlora">32</span>, <span class="code-comment"># The parameter we are tweaking</span>
+    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
+                      "gate_proj", "up_proj", "down_proj"],
+    use_rslora = True, <span class="code-comment"># Rank-Stabilized LoRA</span>
+)`
+            },
+            alpha: {
+                id: 'alpha',
+                title: 'LoRA Alpha',
+                type: 'slider',
+                min: 8, max: 256, step: 8, default: 64,
+                badge: 'Scaling',
+                desc: 'The scaling factor for the LoRA weights. It dictates how strongly the newly learned persona overwrites the base model.',
+                pros: 'Higher Alpha forces the model to strictly adhere to the new dataset (great for extreme personality shifts like "pirate talk").',
+                cons: 'If Alpha is too high compared to Rank, the model becomes unstable and generates gibberish. If too low, the base model ignores the training.',
+                vram_impact: 'None. It is a scalar multiplier applied during calculation.',
+                code: `model = FastLanguageModel.get_peft_model(
+    model,
+    r = 32,
+    lora_alpha = <span class="code-number" id="code-alpha">64</span>, <span class="code-comment"># Usually 2x the Rank for rsLoRA</span>
+    lora_dropout = 0,
+)`
+            },
+            max_seq_length: {
+                id: 'max_seq_length',
+                title: 'Max Sequence Length',
+                type: 'slider',
+                min: 512, max: 4096, step: 512, default: 2048,
+                badge: 'Context Window',
+                desc: 'The maximum number of tokens (words/subwords) the model can process at once during training (Prompt + Response).',
+                pros: 'Longer sequence allows training on complex backstories, multi-turn dialogues, and detailed function calling.',
+                cons: 'Extremely high VRAM cost. Quadratic memory scaling with attention mechanisms.',
+                vram_impact: 'CRITICAL: The main cause of Out-Of-Memory (OOM) errors. 4096 can push the RTX 3060 over 6GB.',
+                code: `max_seq_length = <span class="code-number" id="code-max_seq_length">2048</span>
+
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = "unsloth/gemma-4-E4B-it",
+    max_seq_length = max_seq_length,
+    load_in_4bit = True,
+)`
+            },
+            batch_size: {
+                id: 'batch_size',
+                title: 'Batch Size',
+                type: 'slider',
+                min: 1, max: 8, step: 1, default: 2,
+                badge: 'Throughput',
+                desc: 'How many examples the model processes simultaneously before updating weights.',
+                pros: 'Higher batch size stabilizes learning gradients and speeds up overall training epochs.',
+                cons: 'Linear increase in VRAM usage. Must use Gradient Accumulation to simulate high batch sizes on limited GPUs.',
+                vram_impact: 'High. Directly multiplies activation memory.',
+                code: `trainer = SFTTrainer(
+    args = TrainingArguments(
+        per_device_train_batch_size = <span class="code-number" id="code-batch_size">2</span>,
+        gradient_accumulation_steps = 4, <span class="code-comment"># Effective batch = 8</span>
+        warmup_steps = 5,
+    ),
+)`
+            },
+            learning_rate: {
+                id: 'learning_rate',
+                title: 'Learning Rate',
+                type: 'select',
+                options: ['1e-5 (Cautious)', '2e-5 (Standard)', '1e-4 (Aggressive)', '2e-4 (Very Fast)'],
+                values: [0.00001, 0.00002, 0.0001, 0.0002],
+                defaultIdx: 1,
+                badge: 'Optimization',
+                desc: 'How large of a step the optimizer takes when updating weights based on errors.',
+                pros: 'Proper LR ensures the model converges on the perfect persona efficiently.',
+                cons: 'Too high: Catastrophic forgetting (model goes crazy). Too low: Takes forever to learn the persona.',
+                vram_impact: 'None.',
+                code: `trainer = SFTTrainer(
+    args = TrainingArguments(
+        learning_rate = <span class="code-number" id="code-learning_rate">2e-5</span>,
+        optim = "adamw_8bit", <span class="code-comment"># 8-bit Adam saves VRAM</span>
+        lr_scheduler_type = "linear",
+    ),
+)`
+            },
+            neftune_noise_alpha: {
+                id: 'neftune_noise_alpha',
+                title: 'NEFTune Noise',
+                type: 'slider',
+                min: 0, max: 15, step: 0.5, default: 7.5,
+                badge: 'Generalization',
+                desc: 'Injects random noise into the embeddings during training (Noise Embeddings for Fine-Tuning).',
+                pros: 'Massively improves the model\'s ability to converse naturally and generalize to unseen questions instead of repeating exact training lines.',
+                cons: 'If set too high, the model might struggle to remember exact facts or strict formatting.',
+                vram_impact: 'Minimal. Negligible overhead.',
+                code: `trainer = SFTTrainer(
+    neftune_noise_alpha = <span class="code-number" id="code-neftune_noise_alpha">7.5</span>, <span class="code-comment"># Prevents overfitting</span>
+    train_dataset = dataset,
+    dataset_text_field = "text",
+)`
+            }
+        };
+
+        // State
+        const state = {};
+        let activeParam = null;
+
+        // Initialize State
+        Object.keys(params).forEach(key => {
+            if (params[key].type === 'slider') {
+                state[key] = params[key].default;
+            } else if (params[key].type === 'select') {
+                state[key] = params[key].values[params[key].defaultIdx];
+            }
+        });
+
+        // DOM Elements
+        const grid = document.getElementById('paramGrid');
+        const detailView = document.getElementById('detailView');
+        const vramValue = document.getElementById('vramValue');
+        const vramBar = document.getElementById('vramBar');
+
+        // Render Cards
+        function renderCards() {
+            grid.innerHTML = '';
+            Object.values(params).forEach(p => {
+                const card = document.createElement('div');
+                card.className = `param-card ${activeParam === p.id ? 'active' : ''}`;
+                card.onclick = () => selectParam(p.id);
+
+                let controlHtml = '';
+                let displayVal = state[p.id];
+
+                if (p.type === 'slider') {
+                    controlHtml = `
+                        <div class="slider-container">
+                            <input type="range" id="input-${p.id}" min="${p.min}" max="${p.max}" step="${p.step}" value="${state[p.id]}" oninput="updateParam('${p.id}', this.value); event.stopPropagation();">
+                        </div>
+                    `;
+                } else if (p.type === 'select') {
+                    const idx = p.values.indexOf(state[p.id]);
+                    displayVal = p.options[idx];
+                    controlHtml = `
+                        <div class="slider-container" style="margin-top:15px">
+                            <select id="input-${p.id}" onchange="updateParam('${p.id}', this.value); event.stopPropagation();" 
+                                style="width:100%; padding:8px; border-radius:6px; background:#161925; color:white; border:1px solid rgba(255,255,255,0.1); font-family:var(--font-mono);">
+                                ${p.options.map((opt, i) => `<option value="${p.values[i]}" ${i === idx ? 'selected' : ''}>${opt}</option>`).join('')}
+                            </select>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="param-header">
+                        <div class="param-title">${p.title}</div>
+                        <div class="param-value-display" id="val-${p.id}">${displayVal}</div>
+                    </div>
+                    <div class="param-short-desc">${p.desc.substring(0, 70)}...</div>
+                    ${controlHtml}
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Update Parameter
+        window.updateParam = function(id, val) {
+            if(params[id].type === 'slider') {
+                state[id] = parseFloat(val);
+                document.getElementById(`val-${id}`).innerText = state[id];
+            } else {
+                state[id] = parseFloat(val);
+                const idx = params[id].values.indexOf(state[id]);
+                document.getElementById(`val-${id}`).innerText = params[id].options[idx];
+            }
+            
+            // Auto rules
+            if(id === 'rlora') {
+                // Rule of thumb: Alpha should be 2x Rank for rsLoRA
+                const newAlpha = state.rlora * 2;
+                if(newAlpha <= params.alpha.max) {
+                    state.alpha = newAlpha;
+                    if(document.getElementById(`input-alpha`)) {
+                        document.getElementById(`input-alpha`).value = newAlpha;
+                        document.getElementById(`val-alpha`).innerText = newAlpha;
+                    }
+                }
+            }
+
+            updateVRAM();
+            if(activeParam === id || (id==='rlora' && activeParam==='alpha')) {
+                updateDetailCode();
+            }
+        };
+
+        // Select Parameter
+        window.selectParam = function(id) {
+            activeParam = id;
+            renderCards(); // to update active state
+            
+            const p = params[id];
+            detailView.innerHTML = `
+                <h2 class="detail-title">${p.title} <span class="badge">${p.badge}</span></h2>
+                <p class="detail-description">${p.desc}</p>
+                
+                <div class="pros-cons">
+                    <div class="pro-con-box pro-box">
+                        <div class="box-title"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Pros & Use Cases</div>
+                        <div class="box-content">${p.pros}</div>
+                    </div>
+                    <div class="pro-con-box con-box">
+                        <div class="box-title"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Cons & Risks</div>
+                        <div class="box-content">${p.cons}</div>
+                    </div>
+                    <div class="pro-con-box vram-box">
+                        <div class="box-title"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> VRAM & Perf Impact</div>
+                        <div class="box-content">${p.vram_impact}</div>
+                    </div>
+                </div>
+
+                <div class="box-title" style="color:var(--text-primary); margin-top:1rem; margin-bottom:0.5rem;">Unsloth Implementation</div>
+                <div class="code-preview" id="detailCode">
+                    ${p.code}
+                </div>
+            `;
+            updateDetailCode();
+        };
+
+        // Update Code Snippet Values
+        function updateDetailCode() {
+            if(!activeParam) return;
+            // A bit hacky but works for demo
+            Object.keys(state).forEach(k => {
+                const el = document.getElementById(`code-${k}`);
+                if(el) {
+                    if(k === 'learning_rate') {
+                        // format scientific
+                        el.innerText = state[k].toExponential().replace('e-0', 'e-');
+                    } else {
+                        el.innerText = state[k];
+                    }
+                }
+            });
+        }
+
+        // Calculate VRAM
+        function updateVRAM() {
+            // Base Gemma 4 E4B 4-bit = ~2.5GB
+            let vram = 2.5;
+            
+            // LoRA Rank impact
+            vram += (state.rlora / 32) * 0.15; 
+            
+            // Context Window impact (Quadratic approx)
+            vram += (Math.pow(state.max_seq_length / 1024, 1.5)) * 0.1;
+            
+            // Batch size impact
+            vram += (state.batch_size * 0.05);
+
+            vramValue.innerText = vram.toFixed(2);
+            
+            // Max safe is 5.5 on 6GB card
+            let percent = (vram / 6.0) * 100;
+            vramBar.style.width = `${Math.min(percent, 100)}%`;
+
+            if(vram > 5.5) {
+                vramBar.style.background = 'var(--accent-danger)';
+                vramValue.style.color = 'var(--accent-danger)';
+            } else if (vram > 4.5) {
+                vramBar.style.background = 'var(--accent-warning)';
+                vramValue.style.color = 'var(--accent-warning)';
+            } else {
+                vramBar.style.background = 'linear-gradient(90deg, var(--accent-success), var(--accent-secondary))';
+                vramValue.style.color = 'var(--accent-success)';
+            }
+        }
+
+        // Init
+        renderCards();
+        updateVRAM();
+
+        // Export button logic
+        document.getElementById('exportBtn').onclick = () => {
+            const config = {
+                model_name: "unsloth/gemma-4-E4B-it",
+                lora_r: state.rlora,
+                lora_alpha: state.alpha,
+                max_seq_length: state.max_seq_length,
+                per_device_train_batch_size: state.batch_size,
+                learning_rate: state.learning_rate,
+                neftune_noise_alpha: state.neftune_noise_alpha
+            };
+            
+            const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'custom_training_config.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+    </script>
+</body>
+</html>

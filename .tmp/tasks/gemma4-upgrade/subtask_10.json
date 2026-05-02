@@ -11,16 +11,18 @@
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
   ],
   "reference_files": [
-    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json",
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py"
   ],
   "acceptance_criteria": [
-    "system_prompt_template includes tool_list placeholder",
-    "Prompt template instructs NPC to use tools when relevant",
-    "JSON file is valid format",
-    "All NPC profiles updated with function calling prompts"
+    "NPC profiles include tool definitions",
+    "Prompt templates updated for function calling",
+    "System prompt mentions available tools",
+    "Dataset generation includes function calling examples"
   ],
   "deliverables": [
-    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
+    "Updated npc_profiles.json with tool definitions",
+    "Updated generate_npc_dataset.py for function calling"
   ],
   "agent_id": null,
   "started_at": null,

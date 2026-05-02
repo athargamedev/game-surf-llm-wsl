@@ -11,16 +11,17 @@
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
   ],
   "reference_files": [
-    "/root/Game_Surf/Tools/LLM_WSL/scripts/convert_lora_to_gguf.py"
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/convert_lora_to_gguf.py",
+    "https://blogs.nvidia.com/blog/rtx-ai-garage-open-models-google-gemma-4/"
   ],
   "acceptance_criteria": [
-    "save_pretrained_gguf uses quantization_method='q4_k_m'",
-    "Quantization optimized for RTX Tensor Cores",
-    "Output GGUF file uses Q4_K_M format",
-    "Python file passes syntax check"
+    "Q4_K_M quantization method applied in convert_lora_to_gguf.py",
+    "GGUF export uses optimized settings for RTX",
+    "Model exports with 50% faster inference",
+    "Quantization verified via llama-bench"
   ],
   "deliverables": [
-    "/root/Game_Surf/Tools/LLM_WSL/scripts/convert_lora_to_gguf.py"
+    "Updated convert_lora_to_gguf.py with Q4_K_M"
   ],
   "agent_id": null,
   "started_at": null,

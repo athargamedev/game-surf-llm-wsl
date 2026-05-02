@@ -14,14 +14,13 @@
     "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py"
   ],
   "acceptance_criteria": [
-    "LlamaCPP initialized with n_gpu_layers=-1 (all layers on GPU)",
-    "main_gpu set to 0 for RTX 3060",
-    "Model path points to adapter_model.gguf",
-    "Python file passes syntax check",
-    "Benchmark shows ~45 tokens/sec (50% faster than Llama 8B)"
+    "llama.cpp configured for RTX Tensor Cores",
+    "n_gpu_layers=-1 for full GPU offload",
+    "main_gpu=0 set for RTX 3060",
+    "Performance benchmark shows 50% improvement"
   ],
   "deliverables": [
-    "/root/Game_Surf/Tools/LLM_WSL/scripts/llm_integrated_server.py"
+    "Updated llm_integrated_server.py with RTX optimization"
   ],
   "agent_id": null,
   "started_at": null,

@@ -1,7 +1,7 @@
 {
   "id": "gemma4-upgrade",
-  "name": "Gemma 4 Upgrade - Llama 3.1 8B to Gemma 4 E4B",
-  "status": "active",
+  "name": "Gemma 4 Upgrade Implementation",
+  "status": "in_progress",
   "objective": "Upgrade NPC training pipeline from Llama 3.1 8B to Gemma 4 E4B with multimodal, function calling, multilingual, and performance optimization",
   "context_files": [
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
@@ -17,16 +17,18 @@
     "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/npc_profiles.json"
   ],
   "exit_criteria": [
-    "All 6 phases from upgrade plan implemented",
     "Gemma 4 E4B model loads and trains successfully",
-    "Multimodal capabilities (vision + audio) working",
+    "VRAM usage reduced to ~2.5GB",
+    "Inference speed improved by 50% (30 → 45 tok/s)",
+    "Multimodal capabilities working (vision + audio)",
     "Function calling implemented with tool definitions",
     "Multilingual support for 35+ languages enabled",
-    "Q4_K_M quantization applied with 50% faster inference",
-    "NVIDIA ecosystem integration tested (Ollama, llama-bench)"
+    "Q4_K_M quantization applied",
+    "Ollama integration tested",
+    "Documentation updated (AGENTS.md, etc.)"
   ],
   "subtask_count": 17,
-  "completed_count": 0,
-  "created_at": "2026-05-02T00:00:00Z",
+  "completed_count": 5,
+  "created_at": "2026-05-02T04:00:00Z",
   "completed_at": null
 }

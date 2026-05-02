@@ -11,15 +11,18 @@
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
   ],
   "reference_files": [
-    "/root/Game_Surf/Tools/LLM_WSL/docs/GEMMA4_UPGRADE_PLAN.md"
+    "https://blogs.nvidia.com/blog/rtx-ai-garage-open-models-google-gemma-4/",
+    "https://ollama.com"
   ],
   "acceptance_criteria": [
-    "Ollama installation script documented",
-    "Gemma 4 E4B runs via ollama run command",
-    "Integration test passes with NPC dialogue"
+    "Ollama installed and configured",
+    "Gemma 4 E4B runs via Ollama",
+    "Integration tested with Game_Surf pipeline",
+    "Performance compared to llama.cpp"
   ],
   "deliverables": [
-    "Documentation for Ollama setup with Gemma 4"
+    "Ollama integration documentation",
+    "Performance comparison report"
   ],
   "agent_id": null,
   "started_at": null,

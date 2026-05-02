@@ -7,9 +7,9 @@ Local LLM training pipeline for Unity NPC characters. Generate trained LoRA adap
 ## STRUCTURE
 ```
 LLM_WSL/
-├── research/<npc_id>/           # Knowledge sources (lore, notebooks)
-├── datasets/processed/<npc_id>/  # Prepared training splits
-├── exports/npc_models/<npc_id>/  # Trained models + checkpoints
+├── research/ai_news_instructor/           # Knowledge sources (lore, notebooks)
+├── datasets/processed/ai_news_instructor/  # Prepared training splits
+├── exports/npc_models/ai_news_instructor/  # Trained models + checkpoints
 ├── scripts/                     # Pipeline scripts
 │   ├── run_full_npc_pipeline.py # Main orchestrator
 │   ├── generate_npc_dataset.py  # Phase 1: generation
@@ -48,11 +48,11 @@ LLM_WSL/
 
 ```bash
 # Full pipeline
-./run_pipeline.sh --npc <npc_id>
+./run_pipeline.sh --npc ai_news_instructor
 
 # Skip phases
-./run_pipeline.sh --npc <npc_id> --skip-generation
-./run_pipeline.sh --npc <npc_id> --resume
+./run_pipeline.sh --npc ai_news_instructor --skip-generation
+./run_pipeline.sh --npc ai_news_instructor --resume
 
 # GPU check
 nvidia-smi
@@ -60,6 +60,7 @@ nvidia-smi
 
 ## NOTES
 
+- **AGENT BEHAVIOR RULE:** AI Agents MUST verify and kill orphaned or failed background processes (using `ps`, `pkill`, or checking `pm2 status`) before starting new long-running scripts or tests to avoid port conflicts and memory leaks.
 - Uses Unsloth + Gemma 4 E4B for efficient local training (2.5GB VRAM on RTX 3060 - 50% reduction!)
 - 50% faster inference via RTX Tensor Cores + Q4_K_M quantization
 - Multimodal capabilities: Vision + Audio + Video support
@@ -67,3 +68,18 @@ nvidia-smi
 - 35+ languages supported out-of-the-box
 - Exports to GGUF for Unity llama.cpp inference
 - Supabase stores player memories and dialogue history
+
+## HARDWARE & GPU OFFLOAD
+- **Flash Attention:** Requires 100% of model layers to be loaded into GPU VRAM.
+- **CPU Spillover:** If LM Studio falls back to CPU to prevent OOM (Out of Memory) on the 6GB RTX 3060, Flash Attention disables, causing a massive drop in inference speed (< 10 tokens/sec).
+- **The Fix:** In LM Studio GUI Settings -> Hardware -> Set `GPU Offload` to **Max** (not Auto) and enable Flash Attention. Ensure you load the `Q4_K_M` quantization of Gemma 4 E4B (~2.5GB VRAM) to fit within limits.
+- **Diagnostics:** Run `python scripts/lmstudio_gpu_watchdog.py` to benchmark Time-to-First-Token (TTFT) and detect silent CPU spillover.
+
+## 🧠 OPENCODE & OAC WORKFLOWS
+This project utilizes **OpenCode** and **OpenAgentsControl (OAC)** for powerful, context-aware AI development workflows.
+
+- **Location:** All custom agent logic, skills, and project contexts live in `./.opencode/`.
+- **Context System:** OAC uses MVI (Minimal Viable Information) and `ContextScout` to automatically load project standards before generating code.
+- **Custom Agents:** The primary agents configured are `OpenAgent` (general tasks) and `OpenCoder` (production development).
+- **Running Workflows:** AI tools and developers should leverage the CLI (`opencode --agent OpenCoder`) to initiate structured, multi-file refactoring and component generation that strictly adheres to the project's established conventions.
+- **Skills:** Custom JSON skills (e.g., `skill_notebooklm_dataset.json`, `skill_npc_model_tuning.json`) map specific CLI capabilities for automated NPC training tasks.

@@ -11,17 +11,16 @@
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
   ],
   "reference_files": [
-    "/root/Game_Surf/Tools/LLM_WSL/exports/npc_models/"
+    "https://blogs.nvidia.com/blog/rtx-ai-garage-open-models-google-gemma-4/"
   ],
   "acceptance_criteria": [
-    "llama-bench command runs on exported GGUF models",
-    "Benchmark shows ~45 tokens/sec performance",
-    "Results documented with before/after comparison",
-    "Performance meets 50% improvement target over Llama 8B"
+    "llama-bench runs successfully",
+    "Benchmark shows 50% speed improvement (30→45 tok/s)",
+    "VRAM usage verified at ~2.5GB",
+    "Results documented for comparison"
   ],
   "deliverables": [
-    "Benchmark results documentation",
-    "Performance comparison report"
+    "Benchmark report with performance metrics"
   ],
   "agent_id": null,
   "started_at": null,

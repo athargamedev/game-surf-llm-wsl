@@ -11,16 +11,18 @@
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
   ],
   "reference_files": [
-    "/root/Game_Surf/Tools/LLM_WSL/supabase/"
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/supabase_client.py",
+    "supabase/migrations/"
   ],
   "acceptance_criteria": [
-    "SQL migration adds language_code column to dialogue_sessions table",
-    "Default value set to 'en'",
-    "Migration applied successfully to Supabase",
-    "Column accepts 5-character language codes"
+    "Supabase schema updated with language_code column",
+    "Dialogue sessions support multilingual storage",
+    "Migration script created for schema update",
+    "Supabase client updated for language handling"
   ],
   "deliverables": [
-    "Supabase migration file for multilingual support"
+    "Supabase migration for multilingual support",
+    "Updated supabase_client.py"
   ],
   "agent_id": null,
   "started_at": null,
