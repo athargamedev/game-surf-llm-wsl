@@ -82,12 +82,12 @@ conda run --no-capture-output -n unsloth_env python \
 ```
 
 ## 4. Run the WSL Training Pipeline
-For full native WSL training, use the wrapper:
+For full native WSL training after NotebookLM import/prepare, use the wrapper:
 
 ```bash
-./run_pipeline.sh \
+python scripts/run_full_npc_pipeline.py \
   --npc <npc_key> \
-  --target-count 200 \
+  --skip-generation \
   --epochs 3 \
   --batch-size 1 \
   --grad-accum 8
@@ -96,7 +96,7 @@ For full native WSL training, use the wrapper:
 If generation already succeeded and only training should run:
 
 ```bash
-./run_pipeline.sh --npc <npc_key> --skip-generation
+python scripts/run_full_npc_pipeline.py --npc <npc_key> --skip-generation
 ```
 
 Outputs are written under `exports/npc_models/<artifact_key>/`, including the LoRA adapter and `npc_model_manifest.json`. A GGUF is optional and should only be exported when a target runtime cannot apply adapters.

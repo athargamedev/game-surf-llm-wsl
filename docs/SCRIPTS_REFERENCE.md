@@ -132,24 +132,31 @@ python scripts/god_memory_worker.py
 ### `scripts/generate_npc_dataset.py`
 **Type:** Pipeline Phase 1 | **~1900 lines** | **Inputs:** NPC profile config, research backend
 
+Legacy local-synthesis generator. It is not the canonical Game_Surf dataset path.
+
 Transforms NPC domain knowledge into structured ChatML training examples. Supports two research backends:
 
-- **`notebooklm`** (recommended): Creates a NotebookLM notebook, adds source URLs, queries it for domain knowledge via the `notebooklm-mcp` CLI, and extracts structured `ResearchNote` objects.
-- **`local`**: Falls back to LM Studio (`http://127.0.0.1:1234/v1`) when NotebookLM is unavailable.
+- **`notebooklm`**: Creates a NotebookLM notebook, adds source URLs, queries it for domain knowledge, and extracts structured `ResearchNote` objects.
+- **legacy local synthesis**: Falls back to a local OpenAI-compatible server when old workflows intentionally use it.
 
 Generation runs in three phases:
 1. **Fact extraction** — Research notes → discrete facts (cached in `research/<npc_id>/extracted_facts.json`)
 2. **Task-specific examples** — Generates `teaching` and `quiz` examples in async batches
 3. **Multi-turn conversations** — Sequential generation of 2–4 turn exchanges
 
-Outputs JSONL to `datasets/<npc_id>/<npc_id>_dataset.jsonl`.
+Outputs JSONL to `datasets/personas/<artifact_key>/<dataset_name>.jsonl`.
 
 **Libraries used:** `asyncio`, `openai` (AsyncOpenAI for concurrent generation), `notebooklm-mcp`
 
+Preferred replacement:
+
 ```bash
-python scripts/generate_npc_dataset.py --npc my_npc --backend notebooklm
-python scripts/generate_npc_dataset.py --npc my_npc --backend local  # offline fallback
-python scripts/generate_npc_dataset.py --all                           # all NPCs
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  --npc my_npc \
+  --input research/my_npc/notebooklm_batch_*.jsonl \
+  --import \
+  --prepare
 ```
 
 ---
@@ -220,9 +227,9 @@ Use this to verify dataset health before training.
 ### `scripts/train_surf_llama.py`
 **Type:** Pipeline Phase 3 | **~2300 lines** | **Requires:** CUDA GPU, 6GB+ VRAM
 
-The training engine built on **Unsloth** for memory-efficient LoRA fine-tuning of Llama 3.2 3B Instruct. Key responsibilities:
+The training engine built on **Unsloth** for memory-efficient LoRA fine-tuning of Gemma 4 E4B Instruct. Key responsibilities:
 
-- Loads base model from `unsloth/Llama-3.2-3B-Instruct` (HuggingFace) with 4-bit quantization
+- Loads base model from `unsloth/gemma-4-E4B-it` (HuggingFace) with 4-bit quantization
 - Applies LoRA configuration (rank, alpha, target modules) via `FastLanguageModel`
 - Formats training examples using Llama 3.2 chat template
 - Trains with `SFTTrainer` (TRL library) with configurable batch size, gradient accumulation, and learning rate
@@ -357,8 +364,8 @@ Used as a gating benchmark before a model is marked "ready" for distribution.
 Single-command runner for the complete training pipeline. Calls each phase script as a subprocess, handles VRAM pre-flight checks, and supports `--skip-*` flags for resuming from any phase.
 
 ```bash
-# Full pipeline
-python scripts/run_full_npc_pipeline.py --npc my_npc --target-count 150
+# Train from imported NotebookLM dataset
+python scripts/run_full_npc_pipeline.py --npc my_npc --skip-generation
 
 # Resume from training (skip generation + prep)
 python scripts/run_full_npc_pipeline.py --npc my_npc --skip-generation --skip-prep --resume
@@ -367,10 +374,7 @@ python scripts/run_full_npc_pipeline.py --npc my_npc --skip-generation --skip-pr
 python scripts/run_full_npc_pipeline.py --npc my_npc --skip-generation --skip-prep --skip-sync --skip-eval
 ```
 
-**Or via shell wrapper:**
-```bash
-./run_pipeline.sh --npc my_npc
-```
+Legacy note: running the orchestrator without `--skip-generation` now hits the Phase 1 guard unless `--allow-legacy-generation` is explicitly supplied.
 
 ---
 

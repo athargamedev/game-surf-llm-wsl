@@ -194,7 +194,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--base-model",
-        default="unsloth/Llama-3.2-3B-Instruct",
+        default="unsloth/gemma-4-E4B-it",
         help="Base model for LoRA inference",
     )
     parser.add_argument(

@@ -145,7 +145,7 @@ def check_npc(npc_id: str) -> dict[CheckResult]:
     else:
         results["Trained Model"] = CheckResult(
             "Trained Model", False, "No manifest",
-            f"Run: ./run_pipeline.sh --npc {npc_id}"
+            f"Run: python scripts/run_full_npc_pipeline.py --npc {npc_id} --skip-generation"
         )
 
     chat_html = ROOT / "chat_interface.html"

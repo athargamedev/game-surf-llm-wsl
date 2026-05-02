@@ -14,6 +14,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_MODEL_NAME = "unsloth/gemma-4-E4B-it"
 
 # ==============================================================================
 # VRAM PRE-FLIGHT CHECK (consolidated from train_surf_llama.py)
@@ -96,7 +97,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--npc", required=True, help="Registered NPC key (e.g., 'kai_instructor')")
     parser.add_argument("--subject", default="", help="Optional specific subject for dataset generation.")
     parser.add_argument("--target-count", type=int, default=300, help="Number of interactions to generate (min 300 for stable fine-tuning).")
-    parser.add_argument("--skip-generation", action="store_true", help="Skip generation and reuse the existing raw dataset.")
+    parser.add_argument("--skip-generation", action="store_true", help="Skip generation and reuse an existing NotebookLM-imported raw dataset.")
+    parser.add_argument(
+        "--allow-legacy-generation",
+        action="store_true",
+        help="Explicitly allow the legacy local synthesis generator for Phase 1.",
+    )
     parser.add_argument("--skip-prep", action="store_true", help="Skip dataset preparation and reuse existing prepared splits.")
     parser.add_argument("--skip-training", action="store_true", help="Skip the Unsloth fine-tuning phase.")
     parser.add_argument("--skip-sync", action="store_true", help="Skip runtime artifact sync to Unity.")
@@ -107,7 +113,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-split", type=float, default=0.0, help="Test split ratio during preparation.")
     parser.add_argument("--output-dir", default=None, help="Optional override for the NPC model output directory.")
 
-    parser.add_argument("--model-name", default="unsloth/Llama-3.2-3B-Instruct", help="Base model to use.")
+    parser.add_argument("--model-name", default=DEFAULT_MODEL_NAME, help="Base model to use.")
     parser.add_argument("--save-gguf", default="", help="Optional GGUF quantization (e.g. q4_k_m). Empty keeps this run as a LoRA adapter.")
     parser.add_argument("--epochs", type=int, default=2, help="Training epochs.")
     parser.add_argument("--max-steps", default="-1", help="Override epochs with a fixed number of training steps.")
@@ -148,6 +154,17 @@ def main() -> None:
     print(f"Raw dataset: {spec.raw_dataset_path}")
     print(f"Prepared dataset dir: {spec.processed_dir}")
     print(f"Output dir: {output_dir}")
+
+    if not args.skip_generation and not args.allow_legacy_generation:
+        raise SystemExit(
+            "Phase 1 legacy dataset generation is blocked by default.\n"
+            "Use the NotebookLM-direct workflow first:\n"
+            "  python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc "
+            f"{spec.npc_key} --input research/{spec.npc_key}/notebooklm_batch_*.jsonl --import --prepare\n"
+            "Then train with:\n"
+            f"  python scripts/run_full_npc_pipeline.py --npc {spec.npc_key} --skip-generation\n"
+            "If you intentionally want the old local-synthesis path, rerun with --allow-legacy-generation."
+        )
 
     if not args.skip_generation:
         print("\n>>> Phase 1: Dataset Generation")

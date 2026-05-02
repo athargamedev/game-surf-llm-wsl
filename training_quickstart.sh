@@ -38,7 +38,7 @@ if [ "$MODE" = "small" ]; then
     echo ""
     python scripts/train_surf_llama.py \
         --datasets brazilian_history_dataset marvel_lore_dataset \
-        --model-name unsloth/Llama-3.2-3B-Instruct \
+        --model-name unsloth/gemma-4-E4B-it \
         --batch-size 2 \
         --num-train-epochs 1 \
         --small-dataset \
@@ -52,7 +52,7 @@ elif [ "$MODE" = "full" ]; then
     echo ""
     python scripts/train_surf_llama.py \
         --datasets brazilian_history_dataset marvel_lore_dataset jazz_history_dataset \
-        --model-name unsloth/Llama-3.2-3B-Instruct \
+        --model-name unsloth/gemma-4-E4B-it \
         --batch-size 2 \
         --num-train-epochs 3 \
         --output-dir ./exports/full_training_$(date +%Y%m%d_%H%M%S) \

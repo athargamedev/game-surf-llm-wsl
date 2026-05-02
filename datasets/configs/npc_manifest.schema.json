@@ -20,7 +20,7 @@
     },
     "base_model": {
       "type": "string",
-      "default": "unsloth/Llama-3.2-3B-Instruct",
+      "default": "unsloth/gemma-4-E4B-it",
       "description": "The HuggingFace or Unsloth base model used for training."
     },
     "dataset": {

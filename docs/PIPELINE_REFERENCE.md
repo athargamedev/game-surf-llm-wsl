@@ -155,8 +155,10 @@ python scripts/run_full_npc_pipeline.py \
   [--lora-r 16]
   [--learning-rate 2e-4]
   [--save-gguf q4_k_m]         # GGUF quantization type
-  [--model-name unsloth/Llama-3.2-3B-Instruct]
+  [--model-name unsloth/gemma-4-E4B-it]
 ```
+
+By default, Phase 1 legacy dataset generation is now blocked unless you explicitly pass `--allow-legacy-generation`. This prevents accidental local/model-written datasets when the intended workflow is NotebookLM-direct import + prepare + `--skip-generation`.
 
 > **Agent rule:** Always check `--help` before running. Do not assume flag names.
 
@@ -168,7 +170,7 @@ The canonical workflow uses NotebookLM to create source-backed JSONL batches und
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --input research/maestro_jazz_instructor/notebooklm_batch_*.jsonl \
   --import \
@@ -332,12 +334,12 @@ Memory validation contract:
 
 ## 5. Skill Interface (Agent Automation)
 
-Use the local Codex skills under `.opencode/skills/`:
+Use the local Codex skills under `.codex/skills/`:
 
 ```bash
 # Dataset creation/import/prepare
 conda run --no-capture-output -n unsloth_env python \
-  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help
 
 # Workflow trace
 conda run --no-capture-output -n unsloth_env python \
@@ -355,7 +357,7 @@ The `npc-model-tuning` skill owns WSL CUDA readiness, Unsloth training, adapter 
 
 # 2. Generate/import NotebookLM-direct batches (preferred path)
 conda run --no-capture-output -n unsloth_env python \
-  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc <npc_key> \
   --input research/<npc_key>/notebooklm_batch_*.jsonl \
   --import \
@@ -376,7 +378,7 @@ python scripts/server_manager.py start --auto
 - 50-example ask timed out; reliable path was 5 narrowed batches of 10
 - Import result: `49 valid unique`, avg quality `0.883`, memory slot rate `1.0`
 - Prepared splits: `45 train / 4 validation`
-- Training: `unsloth/Llama-3.2-3B-Instruct`, LoRA-only artifacts
+- Training: `unsloth/gemma-4-E4B-it`, LoRA-only artifacts
 - Final losses: train `1.875`, eval `1.936`
 - Runtime validation succeeded after adding `brazilian_history_instructor` to `/test-10-player`
 - Automated test answered correctly and populated Supabase NPC memories

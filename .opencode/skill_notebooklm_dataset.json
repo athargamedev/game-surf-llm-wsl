@@ -3,10 +3,10 @@
   "description": "Automate Game_Surf NotebookLM NPC dataset creation: generate prompts, import JSONL batches, validate/deduplicate, prepare splits, run smoke tests.",
   "short_description": "Automate NotebookLM NPC dataset workflow",
   "commands": {
-    "generate_prompt": "conda run --no-capture-output -n unsloth_env python .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc <npc> --subject <subject> --batch-id <id> --count <count> --write-prompt-only",
-    "query_notebooklm": "conda run --no-capture-output -n unsloth_env python .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc <npc> --subject <subject> --batch-id <id> --count <count> --notebook-id <id> --run-notebooklm --import --prepare",
-    "import_batch": "conda run --no-capture-output -n unsloth_env python .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc <npc> --input <input> --import --prepare",
-    "smoke_test": "./run_pipeline.sh --npc <npc> --skip-generation --skip-prep --target-count 25 --max-steps 2 --epochs 1"
+    "generate_prompt": "conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc <npc> --subject <subject> --batch-id <id> --count <count> --write-prompt-only",
+    "query_notebooklm": "conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc <npc> --subject <subject> --batch-id <id> --count <count> --notebook-id <id> --run-notebooklm --import --prepare",
+    "import_batch": "conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc <npc> --input <input> --import --prepare",
+    "smoke_test": "python scripts/run_full_npc_pipeline.py --npc <npc> --skip-generation --skip-prep --target-count 25 --max-steps 2 --epochs 1"
   },
   "prerequisites": [
     "conda run -n unsloth_env python -c 'import torch; print(torch.cuda.is_available())'",

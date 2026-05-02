@@ -106,8 +106,8 @@ NPC knowledge files are stored in `research/<npc_id>/`:
 ## Commands
 
 ```bash
-# Run full NPC pipeline
-./run_pipeline.sh --npc <npc_id>
+# Train from imported NotebookLM dataset
+python scripts/run_full_npc_pipeline.py --npc <npc_id> --skip-generation
 
 # Run servers
 python run_chat_server.py  # Web UI (8080)

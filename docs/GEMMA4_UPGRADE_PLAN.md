@@ -47,7 +47,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 ### Task 1.3: Test Gemma 4 with Unsloth
 **Action:** Run smoke test with one NPC (greek_mythology_instructor)
 ```bash
-./run_pipeline.sh --npc greek_mythology_instructor --skip-generation --resume
+python scripts/run_full_npc_pipeline.py --npc greek_mythology_instructor --skip-generation --resume
 ```
 
 ## Phase 2: Multimodal NPC Capabilities (Week 2)

@@ -165,10 +165,10 @@ run_phase() {
     
     case "$phase" in
         run)
-            ./run_pipeline.sh --npc "$npc_id" $options
+            python scripts/run_full_npc_pipeline.py --npc "$npc_id" --skip-generation $options
             ;;
         gen)
-            python scripts/generate_npc_dataset.py --npc "$npc_id" $options
+            conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc "$npc_id" $options
             ;;
         prep)
             python scripts/prepare_dataset.py --input "$RESEARCH_DIR/$npc_id"/raw.jsonl --output "$DATASETS_DIR/$npc_id"/ $options

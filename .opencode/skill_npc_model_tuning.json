@@ -8,9 +8,9 @@
     "lm_load": "python .codex/skills/npc-model-tuning/scripts/tune_model.py lm-load <model_id>",
     "test_connection": "conda run --no-capture-output -n unsloth_env python .codex/skills/npc-model-tuning/scripts/tune_model.py test-connection --model <model_id>",
     "tune_npc": "python .codex/skills/npc-model-tuning/scripts/tune_model.py tune --npc <npc> --temp <temp> --tokens <tokens>",
-    "generate_dataset": "conda run --no-capture-output -n unsloth_env python scripts/generate_npc_dataset.py --npc <npc> --target-count <count> --batch-size 1 --skip-research",
-    "train": "./run_pipeline.sh --npc <npc> --target-count 200 --epochs 3",
-    "run_pipeline": "./run_pipeline.sh --npc <npc> --skip-generation",
+    "generate_dataset": "conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --npc <npc> --input <input> --import --prepare",
+    "train": "python scripts/run_full_npc_pipeline.py --npc <npc> --skip-generation --epochs 3 --model-name unsloth/gemma-4-E4B-it",
+    "run_pipeline": "python scripts/run_full_npc_pipeline.py --npc <npc> --skip-generation --model-name unsloth/gemma-4-E4B-it",
     "sync_artifacts": "conda run --no-capture-output -n unsloth_env python scripts/sync_runtime_artifacts.py",
     "start_server": "conda run --no-capture-output -n unsloth_env python scripts/llm_integrated_server.py"
   },

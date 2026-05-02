@@ -214,7 +214,7 @@ def main() -> None:
         print("[OK] Ready for dataset generation!")
         print("  Backend: NotebookLM datasets + WSL Unsloth training")
         print("\nNext step:")
-        print("  conda run --no-capture-output -n unsloth_env python .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help")
+        print("  conda run --no-capture-output -n unsloth_env python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py --help")
     elif all_core_ok:
         print("⚠ Core config OK, but NotebookLM is not ready")
         if not notebooklm_ok:

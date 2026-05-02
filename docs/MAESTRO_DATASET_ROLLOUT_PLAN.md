@@ -95,7 +95,7 @@ Suggested prompt-only command for one batch:
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --subject "early New Orleans jazz, Congo Square, Buddy Bolden, King Oliver, Louis Armstrong" \
   --count 20 \
@@ -107,7 +107,7 @@ Suggested import-and-prepare command after collecting batch files:
 
 ```bash
 conda run --no-capture-output -n unsloth_env python \
-  .opencode/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
   --npc maestro_jazz_instructor \
   --input research/maestro_jazz_instructor/notebooklm_batch_*.jsonl \
   --import \
@@ -166,7 +166,7 @@ python scripts/run_full_npc_pipeline.py \
   --quality-threshold 0.78 \
   --val-split 0.1 \
   --test-split 0.0 \
-  --model-name unsloth/Llama-3.2-3B-Instruct \
+  --model-name unsloth/gemma-4-E4B-it \
   --epochs 2 \
   --batch-size 1 \
   --grad-accum 4 \

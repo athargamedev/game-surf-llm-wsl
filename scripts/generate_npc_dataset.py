@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-NPC LoRA Dataset Generator — NotebookLM Research → Training Data Pipeline
+Legacy NPC LoRA Dataset Generator — NotebookLM Research → Local Synthesis Pipeline
 
 Automated workflow that:
   1. Creates a NotebookLM notebook for a chosen NPC subject
@@ -8,17 +8,17 @@ Automated workflow that:
   3. Transforms research into structured ChatML training examples
   4. Outputs JSONL files matching the Game_Surf dataset schema
 
-Supports two research backends:
-    - "notebooklm" : Uses notebooklm CLI to query a NotebookLM notebook
-  - "local"      : Uses a local LLM (LM Studio / llama.cpp) to generate
-                    research and dialogue from the profile alone
+Supports research backends that ultimately synthesize examples locally.
+This script is retained for explicit legacy use and is not the canonical
+Game_Surf dataset path.
 
 Usage:
-    # Full pipeline with NotebookLM research
+    # Legacy pipeline with NotebookLM research
     python generate_npc_dataset.py --npc kai_instructor
 
-    # Local-only mode (no NotebookLM required)
-    python generate_npc_dataset.py --npc kai_instructor --backend local
+    # Canonical project path (preferred)
+    python .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+        --npc kai_instructor --input research/kai_instructor/notebooklm_batch_*.jsonl --import --prepare
 
     # Generate for all NPCs
     python generate_npc_dataset.py --all
@@ -217,7 +217,7 @@ def research_via_notebooklm(
         print(f"  Creating NotebookLM notebook: '{profile.display_name} Research'...")
         result = _run_notebooklm_command(
             [
-                "/root/miniforge3/bin/notebooklm",
+                "notebooklm",
                 "create",
                 f"Research: {profile.display_name}",
             ]
@@ -232,14 +232,13 @@ def research_via_notebooklm(
     for url in profile.notebooklm_sources:
         print(f"  Adding source: {url}")
         # Use this notebook context first
-        _run_notebooklm_command(["/root/miniforge3/bin/notebooklm", "use", notebook_id])
+        _run_notebooklm_command(["notebooklm", "use", notebook_id])
         _run_notebooklm_command(
             [
-                "/root/miniforge3/bin/notebooklm",
+                "notebooklm",
                 "source",
                 "add",
-                "--url", url,
-                "--wait",
+                url,
             ]
         )
         time.sleep(5)  # 5s between source ingestions — avoids NotebookLM queue overflow
@@ -260,7 +259,7 @@ def research_via_notebooklm(
             print(f"  Querying: {query[:60]}...")
             result = _run_notebooklm_command(
                 [
-                    "/root/miniforge3/bin/notebooklm",
+                    "notebooklm",
                     "ask",
                     query,
                 ]
@@ -1638,7 +1637,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--llm-model",
-        default=None,
+        default="local-model",
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
@@ -1747,18 +1746,16 @@ def run_for_profile(
 
     # Auto-detect LLM backend if not specified
     if not args.llm_url:
-        # Try Ollama first (no VRAM needed for generation)
         try:
             import urllib.request
-            urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
-            args.llm_url = "http://localhost:11434/v1"
+            urllib.request.urlopen("http://192.168.0.3:1234/v1/models", timeout=2)
+            args.llm_url = "http://192.168.0.3:1234"
+            print(f"  [AUTO] Using LMStudio: {args.llm_url}")
+        except Exception:
+            args.llm_url = "http://localhost:11434"
             if not args.llm_model:
                 args.llm_model = "llama3.2:latest"
             print(f"  [AUTO] Using Ollama: {args.llm_url} model={args.llm_model}")
-        except Exception:
-            # Fall back to LMStudio
-            args.llm_url = "http://localhost:1234/v1"
-            print(f"  [AUTO] Using LMStudio: {args.llm_url}")
     if not _preflight_local_llm(args.llm_url, args.llm_model):
         print("  WARNING: Local LLM check failed, continuing anyway...")
 

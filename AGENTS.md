@@ -26,8 +26,9 @@ LLM_WSL/
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Run full pipeline | `./run_pipeline.sh` or `python scripts/run_full_npc_pipeline.py` | 5 phases automated |
-| Generate dataset | `scripts/generate_npc_dataset.py` | Phase 1 |
+| Run full pipeline | `python scripts/run_full_npc_pipeline.py --npc <npc> --skip-generation` | Train/sync/eval after NotebookLM import |
+| Generate/import dataset | `.codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py` | Canonical NotebookLM-direct path |
+| Legacy dataset generator | `scripts/generate_npc_dataset.py` | Legacy local synthesis only |
 | Prepare dataset | `scripts/prepare_dataset.py` | Phase 2 |
 | Train model | `scripts/train_surf_llama.py` | Phase 3 - Unsloth |
 | Export GGUF | `scripts/convert_lora_to_gguf.py` | Phase 4 |
@@ -47,12 +48,17 @@ LLM_WSL/
 ## COMMANDS
 
 ```bash
-# Full pipeline
-./run_pipeline.sh --npc ai_news_instructor
+# Import + prepare NotebookLM batches
+conda run --no-capture-output -n unsloth_env python \
+  .codex/skills/notebooklm-npc-datasets/scripts/notebooklm_dataset_workflow.py \
+  --npc ai_news_instructor \
+  --input research/ai_news_instructor/notebooklm_batch_*.jsonl \
+  --import \
+  --prepare
 
-# Skip phases
-./run_pipeline.sh --npc ai_news_instructor --skip-generation
-./run_pipeline.sh --npc ai_news_instructor --resume
+# Train from imported dataset
+python scripts/run_full_npc_pipeline.py --npc ai_news_instructor --skip-generation
+python scripts/run_full_npc_pipeline.py --npc ai_news_instructor --skip-generation --resume
 
 # GPU check
 nvidia-smi

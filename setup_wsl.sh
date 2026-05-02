@@ -42,6 +42,6 @@ fi
 
 echo "============================================================"
 echo "[SUCCESS] WSL Setup Complete!"
-echo "To start training, run: ./run_pipeline.sh --npc <npc_key>"
+echo "To start training, run: python scripts/run_full_npc_pipeline.py --npc <npc_key> --skip-generation"
 echo "Or activate manually: conda activate unsloth_env"
 echo "============================================================"

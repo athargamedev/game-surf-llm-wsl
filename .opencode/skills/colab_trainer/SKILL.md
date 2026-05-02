@@ -127,7 +127,7 @@ Create a notebook with:
    "source": [
     "# Configuration\n",
     "NPC_KEY = 'your_npc'\n",
-    "MODEL_NAME = 'unsloth/Llama-3.2-3B-Instruct'\n",
+    "MODEL_NAME = 'unsloth/gemma-4-E4B-it'\n",
     "# ..."
    ]
   }

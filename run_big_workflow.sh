@@ -2,16 +2,17 @@
 # ============================================================
 # run_big_workflow.sh — GameSurf NPC Kit Full Pipeline Run
 #
-# Generates 300-example datasets, trains all LoRA adapters,
+# Reuses imported NotebookLM datasets, trains all LoRA adapters,
 # exports GGUFs, runs quality benchmarks, and summarises results.
 #
 # Usage:
-#   ./run_big_workflow.sh                  # full run all NPCs
-#   ./run_big_workflow.sh --skip-gen       # skip generation, retrain only
-#   ./run_big_workflow.sh --skip-train     # generate only, no training
+#   ./run_big_workflow.sh                  # retrain all NPCs from prepared NotebookLM data
+#   ./run_big_workflow.sh --skip-train     # validation / non-training pass
+#   ./run_big_workflow.sh --allow-legacy-generation  # opt in to old local generator
 #   ./run_big_workflow.sh --npc supabase_instructor  # single NPC
 # ============================================================
 set -euo pipefail
+export PYTHONUNBUFFERED=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="/tmp/npc_big_run.log"
@@ -27,8 +28,9 @@ warn() { echo -e "${YELLOW}[$(date '+%H:%M:%S')] ⚠  $*${RESET}" | tee -a "$LOG
 err()  { echo -e "${RED}[$(date '+%H:%M:%S')] ❌ $*${RESET}" | tee -a "$LOG_FILE"; }
 
 # ── Args ─────────────────────────────────────────────────────
-SKIP_GEN=false
+SKIP_GEN=true
 SKIP_TRAIN=false
+ALLOW_LEGACY_GENERATION=false
 SINGLE_NPC=""
 TARGET_COUNT=300
 EPOCHS=3
@@ -36,6 +38,7 @@ EPOCHS=3
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-gen)    SKIP_GEN=true ;;
+        --allow-legacy-generation) ALLOW_LEGACY_GENERATION=true ;;
         --skip-train)  SKIP_TRAIN=true ;;
         --npc)         SINGLE_NPC="$2"; shift ;;
         --count)       TARGET_COUNT="$2"; shift ;;
@@ -73,6 +76,7 @@ FAILED_NPCS=()
 log "============================================================"
 log "  GameSurf NPC Kit — Big Workflow Run"
 log "  NPCs: ${#NPCS[@]} | Count: ${TARGET_COUNT} | Epochs: ${EPOCHS}"
+log "  Dataset mode: $( $ALLOW_LEGACY_GENERATION && printf 'legacy local generation enabled' || printf 'NotebookLM-imported datasets only' )"
 log "  Log: ${LOG_FILE}"
 log "============================================================"
 
@@ -83,14 +87,13 @@ nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader,nounits 2>/
 
 log "Pre-flight: checking LMStudio (should be OFF during training)..."
 if curl -s --max-time 2 "http://192.168.0.3:1234/v1/models" > /dev/null 2>&1; then
-    warn "LMStudio is running. It will use ~2-3GB VRAM during generation (OK)."
-    warn "Remember to CLOSE it before Phase 2 (training) begins if VRAM < 4GB free."
+    warn "LMStudio is running. Close it before training if VRAM is tight."
 else
-    warn "LMStudio not responding — dataset generation will use local fallback mode."
+    warn "LMStudio not responding. That is fine for NotebookLM-imported dataset training."
 fi
 echo "" | tee -a "$LOG_FILE"
 
-# ── Phase 1 + 2: Generate + Train per NPC ────────────────────
+# ── Phase 1 + 2: Train per NPC from prepared datasets ─────────
 for NPC in "${NPCS[@]}"; do
     NPC_START=$(date +%s)
     GEN_OK=false
@@ -118,6 +121,9 @@ for NPC in "${NPCS[@]}"; do
 
     if $SKIP_GEN; then
         PIPELINE_ARGS+=("--skip-generation")
+    fi
+    if $ALLOW_LEGACY_GENERATION; then
+        PIPELINE_ARGS+=("--allow-legacy-generation")
     fi
     if $SKIP_TRAIN; then
         PIPELINE_ARGS+=("--skip-training" "--skip-sync")

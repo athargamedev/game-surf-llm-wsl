@@ -128,11 +128,11 @@ ln -s /mnt/d/UnityWorkspaces/Game_Surf/Tools/LLM/datasets ./datasets
 # Activate environment
 conda activate unsloth_env
 
-# Run full pipeline
-./run_pipeline.sh --npc maestro_jazz_instructor
+# Train from imported NotebookLM dataset
+python scripts/run_full_npc_pipeline.py --npc maestro_jazz_instructor --skip-generation
 
 # With options
-./run_pipeline.sh --npc maestro_jazz_instructor --epochs 3 --resume
+python scripts/run_full_npc_pipeline.py --npc maestro_jazz_instructor --skip-generation --epochs 3 --resume
 
 # Check GPU memory
 python -c "import torch; print(torch.cuda.get_device_properties(0).total_memory / 1e9, 'GB')"
@@ -174,5 +174,5 @@ source ~/miniforge3/etc/profile/conda.sh
 ## Next Steps
 
 1. **Quick Start**: [docs/QUICK_START.md](QUICK_START.md)
-2. **Run Pipeline**: `./run_pipeline.sh --npc maestro_jazz_instructor`
+2. **Run Pipeline**: `python scripts/run_full_npc_pipeline.py --npc maestro_jazz_instructor --skip-generation`
 3. **Test Chat**: http://127.0.0.1:8080/chat_interface.html
