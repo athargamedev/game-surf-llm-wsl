@@ -30,7 +30,7 @@ This file records durable workflow lessons for Game_Surf NPC dataset generation,
 ### Consolidation Improvements
 1. **Single Entry Point:** `run_full_npc_pipeline.py` is now the canonical entry point. Updated NPC_TRAINING_WORKFLOW.md to reference `./run_pipeline.sh` instead of direct script calls.
 2. **VRAM Pre-flight:** Consolidated `check_vram_guard()` into `run_full_npc_pipeline.py` (lines 19-44). Individual scripts no longer need separate VRAM checks at startup.
-3. **NPC ID Standardization:** Updated docs with all 10 NPCs. Note: `kosmos_instructor` (NPC key) → `greek_mythology_instructor` (artifact_key) is INTENTIONAL (artifact_key matches Supabase ID).
+3. **NPC ID Standardization:** Updated docs with all 10 NPCs. Note: `cosmos_instructor` (NPC key) → `greek_mythology_instructor` (artifact_key) is INTENTIONAL (artifact_key matches Supabase ID).
 
 ### Efficiency Gains
 - **Dead Code Removed:** Legacy LM Studio support completely removed from setup script.
@@ -164,7 +164,7 @@ bash scripts/start_servers.sh
 | NPC Key | Artifact Key | Status |
 |----------|--------------|--------|
 | `maestro_jazz_instructor` | `jazz_history_instructor` | Trained |
-| `greek_mythology_instructor` | `greek_mythology_instructor` | Trained (note: NPC key is `kosmos_instructor` in profiles) |
+| `greek_mythology_instructor` | `greek_mythology_instructor` | Trained (note: NPC key is `cosmos_instructor` in profiles) |
 | `brazilian_history` | `brazilian_history_instructor` | Trained |
 | `marvel_comics_instructor` | `marvel_comics_instructor` | Trained |
 | `llm_instructor` | `llm_instructor` | Trained |

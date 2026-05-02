@@ -52,7 +52,7 @@
 - Processed splits: `{}`
 - Latest eval loss: none
 
-### kosmos_instructor
+### cosmos_instructor
 - Dataset: `greek_mythology_dataset`
 - Raw examples: 47
 - Task distribution: `{'quiz': 10, 'teaching': 37}`

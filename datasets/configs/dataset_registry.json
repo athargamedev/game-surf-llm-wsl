@@ -4,8 +4,8 @@
   "_note": "Each persona has its own folder: datasets/personas/{persona_key}/{persona_key}_dataset.jsonl",
   "datasets": [
     {
-      "name": "greek_mythology_dataset",
-      "path": "datasets/personas/greek_mythology_instructor/greek_mythology_dataset.jsonl",
+      "name": "greek_mythology_instructor_dataset",
+      "path": "datasets/personas/greek_mythology_instructor/greek_mythology_instructor_dataset.jsonl",
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
@@ -15,8 +15,8 @@
       "_note": "Imported from NotebookLM direct JSONL - Professor Kosmos"
     },
     {
-      "name": "jazz_history_dataset",
-      "path": "datasets/personas/jazz_history_instructor/jazz_history_dataset.jsonl",
+      "name": "jazz_history_instructor_dataset",
+      "path": "datasets/personas/maestro_jazz_instructor/jazz_history_instructor_dataset.jsonl",
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
@@ -26,8 +26,8 @@
       "_note": "Imported from NotebookLM direct JSONL - The Maestro"
     },
     {
-      "name": "brazilian_history_dataset",
-      "path": "datasets/personas/brazilian_history_instructor/brazilian_history_dataset.jsonl",
+      "name": "brazilian_history_instructor_dataset",
+      "path": "datasets/personas/brazilian_history_instructor/brazilian_history_instructor_dataset.jsonl",
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
@@ -35,17 +35,6 @@
       "weight": 1.0,
       "source_kind": "notebooklm_direct",
       "_note": "Imported from NotebookLM direct JSONL - Professor Pedro"
-    },
-    {
-      "name": "astronomy_dataset",
-      "path": "datasets/personas/astronomy_instructor/astronomy_dataset.jsonl",
-      "task_type": "mixed",
-      "npc_scope": "instructor",
-      "format": "chatml",
-      "sample_count": 200,
-      "weight": 1.0,
-      "source_kind": "synthetic",
-      "_note": "Dr. Cosmos — Astronomy instructor"
     },
     {
       "name": "movies_instructor_dataset",
@@ -92,8 +81,8 @@
       "_note": "Imported from NotebookLM direct JSONL - AI News Analyst"
     },
     {
-      "name": "marvel_lore_dataset",
-      "path": "datasets/personas/marvel_comics_instructor/marvel_lore_dataset.jsonl",
+      "name": "marvel_comics_instructor_dataset",
+      "path": "datasets/personas/marvel_comics_instructor/marvel_comics_instructor_dataset.jsonl",
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",
@@ -103,8 +92,8 @@
       "_note": "Imported from NotebookLM direct JSONL - MarvelOracle"
     },
     {
-      "name": "solar_system_dataset",
-      "path": "datasets/personas/solar_system_instructor/solar_system_dataset.jsonl",
+      "name": "solar_system_instructor_dataset",
+      "path": "datasets/personas/solar_system_instructor/solar_system_instructor_dataset.jsonl",
       "task_type": "mixed",
       "npc_scope": "instructor",
       "format": "chatml",

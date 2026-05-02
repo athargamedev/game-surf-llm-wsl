@@ -149,7 +149,7 @@ After training completes successfully, automatically:
 
 ### Step 1: Add NPC to Chat Interface
 
-Add to `.npc-selector` div (after `<div class="npc-option" data-npc="kosmos_instructor">`):
+Add to `.npc-selector` div (after `<div class="npc-option" data-npc="cosmos_instructor">`):
 ```html
 <div class="npc-option" data-npc="llm_instructor">
     🤖 LoRA Instructor

@@ -93,7 +93,7 @@ Tools/LLM/datasets/configs/npc_profiles.json
 | `maestro_jazz_instructor` | The Maestro | `jazz_history_instructor` | Jazz history, music theory, improvisation |
 | `brazilian_history` | Professor Pedro | `brazilian_history_instructor` | History of Brazil, Colonial era, Empire |
 | `marvel_comics_instructor` | MarvelOracle | `marvel_comics_instructor` | Marvel Comics lore, Avengers, X-Men |
-| `kosmos_instructor` | Professor Kosmos | `greek_mythology_instructor` | Greek/Roman Mythology, heroic epics |
+| `cosmos_instructor` | Professor Kosmos | `greek_mythology_instructor` | Greek/Roman Mythology, heroic epics |
 | `solar_system_instructor` | Professor Sol | `solar_system_instructor` | Solar System, planets, space exploration |
 | `llm_instructor` | Professor LoRA | `llm_instructor` | LoRA Fine-tuning, ML concepts |
 | `movies_instructor` | Professor Reel | `movies_instructor` | Cinema/Film Studies |

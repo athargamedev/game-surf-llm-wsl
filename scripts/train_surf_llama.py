@@ -482,7 +482,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--datasets",
         nargs="+",
-        default=["brazilian_history_dataset"],
+        default=["brazilian_history_instructor_dataset"],
         help="Datasets to use (from registry or paths)",
     )
     parser.add_argument(

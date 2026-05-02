@@ -410,7 +410,7 @@ def main() -> None:
         print(f"  - {npc.npc_id}: {npc.display_name}")
 
     print("\nStats for test player/test_npc:")
-    stats = client.get_player_npc_stats("test_player", "kosmos_instructor")
+    stats = client.get_player_npc_stats("test_player", "cosmos_instructor")
     if stats:
         print(f"  Sessions: {stats.get('total_sessions')}, Turns: {stats.get('total_turns')}, Memories: {stats.get('total_memories')}")
     else:

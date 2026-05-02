@@ -64,8 +64,8 @@ MODEL_PATH = os.environ.get(
     "exports/training_test_export/gguf_gguf/llama-3.2-3b-instruct.Q4_K_M.gguf",
 )
 BASE_MODEL_PATH = MODEL_PATH
-LORE_DIR = os.environ.get("LORE_DIR", "research/world_lore")
-INDEX_STORAGE = os.environ.get("INDEX_STORAGE", "datasets/indexes/world_lore")
+LORE_DIR = os.environ.get("LORE_DIR", "research/")
+INDEX_STORAGE = os.environ.get("INDEX_STORAGE", "datasets/indexes/")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "http://127.0.0.1:16433")
 SUPABASE_KEY = (
     os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
@@ -95,7 +95,7 @@ TEST_NPC_IDS = [
     "llm_instructor",
     "marvel_comics_instructor",
     "supabase_instructor",
-    "kosmos_instructor",
+    "cosmos_instructor",
     "brazilian_history_instructor",
     "solar_system_instructor",
 ]
@@ -2093,19 +2093,19 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
                     </div>
                 </div>
                 
-                <div class="npc-card enabled" id="npc-card-kosmos_instructor">
+                <div class="npc-card enabled" id="npc-card-cosmos_instructor">
                     <div class="npc-header">
-                        <input type="checkbox" id="enable-kosmos_instructor" value="kosmos_instructor" checked>
-                        <label for="enable-kosmos_instructor">🏛️ Professor Kosmos</label>
+                        <input type="checkbox" id="enable-cosmos_instructor" value="cosmos_instructor" checked>
+                        <label for="enable-cosmos_instructor">🏛️ Professor Kosmos</label>
                     </div>
-                    <div class="npc-fields active" id="fields-kosmos_instructor">
+                    <div class="npc-fields active" id="fields-cosmos_instructor">
                         <div class="form-group">
                             <label>Message 1</label>
-                            <textarea id="msg1-kosmos_instructor">Tell me about Greek mythology.</textarea>
+                            <textarea id="msg1-cosmos_instructor">Tell me about Greek mythology.</textarea>
                         </div>
                         <div class="form-group">
                             <label>Message 2</label>
-                            <textarea id="msg2-kosmos_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
+                            <textarea id="msg2-cosmos_instructor">Do you remember our last conversation? tell me more about that subject</textarea>
                         </div>
                     </div>
                 </div>
@@ -2215,7 +2215,7 @@ HTML_TEST_PAGE = '''<!DOCTYPE html>
         const form = document.getElementById('testForm');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const testNpcIds = ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'kosmos_instructor', 'brazilian_history_instructor', 'solar_system_instructor'];
+        const testNpcIds = ['ai_news_instructor', 'maestro_jazz_instructor', 'llm_instructor', 'marvel_comics_instructor', 'supabase_instructor', 'cosmos_instructor', 'brazilian_history_instructor', 'solar_system_instructor'];
         
         let pollInterval;
         
@@ -2559,20 +2559,20 @@ _NPC_PROBE_MESSAGES: dict[str, str] = {
     "llm_instructor": "What is LoRA and how does it work?",
     "marvel_comics_instructor": "Who is your favorite Avenger and why?",
     "supabase_instructor": "What is PostgreSQL and why use it?",
-    "kosmos_instructor": "Tell me about a Greek god.",
+    "cosmos_instructor": "Tell me about a Greek god.",
     "brazilian_history_instructor": "Tell me about an important moment in Brazilian history.",
     "solar_system_instructor": "Why are the inner planets rocky?",
 }
 
 # Expected name fragments for identity verification
-# kosmos_instructor: include "whispers", "sage", "olympus", "cosmos" (all appear in LoRA responses)
+# cosmos_instructor: include "whispers", "sage", "olympus", "cosmos" (all appear in LoRA responses)
 _NPC_NAME_PATTERNS: dict[str, list[str]] = {
     "ai_news_instructor": ["ai news", "analyst"],
     "maestro_jazz_instructor": ["maestro", "jazz"],
     "llm_instructor": ["lora", "loRA"],
     "marvel_comics_instructor": ["marvel", "oracle", "marveloracle"],
     "supabase_instructor": ["supabase"],
-    "kosmos_instructor": ["kosmos", "sage", "olympus", "whispers", "cosmos"],
+    "cosmos_instructor": ["kosmos", "sage", "olympus", "whispers", "cosmos"],
     "brazilian_history_instructor": ["pedro", "brazil", "brazilian"],
     "solar_system_instructor": ["sol", "solar system", "planet", "orbit"],
 }
@@ -3327,7 +3327,7 @@ async def api_all_npc_identity() -> dict:
     """Probe all NPCs' identities at once."""
     results = {}
     for npc_id in ["ai_news_instructor", "maestro_jazz_instructor", "llm_instructor",
-                   "marvel_comics_instructor", "supabase_instructor", "kosmos_instructor"]:
+                   "marvel_comics_instructor", "supabase_instructor", "cosmos_instructor"]:
         results[npc_id] = probe_npc_identity_sync(npc_id) or {"npc_id": npc_id, "error": "probe failed"}
     return {"probes": results}
 

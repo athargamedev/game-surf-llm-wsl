@@ -12,7 +12,7 @@ Can be used standalone or integrated into generate_npc_dataset.py.
 
 Usage:
     # Score a single dataset file
-    python quality_judge.py --input datasets/personas/jazz_history_instructor/jazz_history_dataset.jsonl
+    python quality_judge.py --input datasets/personas/maestro_jazz_instructor/jazz_history_instructor_dataset.jsonl
 
     # Score and filter (keep only quality >= threshold)
     python quality_judge.py --input dataset.jsonl --output filtered.jsonl --threshold 0.6

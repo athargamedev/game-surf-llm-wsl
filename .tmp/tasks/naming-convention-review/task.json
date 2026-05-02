@@ -1,7 +1,7 @@
 {
   "id": "naming-convention-review",
   "name": "Project-Wide Naming Convention Review & Standardization",
-  "status": "active",
+  "status": "completed",
   "objective": "Review and fix all file/folder naming to follow kebab-case + _instructor suffix pattern, clean generated data, and prepare for dataset regeneration",
   "context_files": [
     "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
@@ -26,7 +26,7 @@
     "Pipeline test passes for at least one NPC with --skip-generation --resume"
   ],
   "subtask_count": 19,
-  "completed_count": 0,
+  "completed_count": 18,
   "created_at": "2026-05-02T00:00:00Z",
-  "completed_at": null
+  "completed_at": "2026-05-02T03:50:00Z"
 }
