@@ -1,0 +1,32 @@
+{
+  "id": "naming-convention-review-18",
+  "seq": "18",
+  "title": "Prepare for dataset regeneration (create empty batch folders, add rate limit delays)",
+  "status": "pending",
+  "depends_on": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/run_full_npc_pipeline.py",
+    "/root/Game_Surf/Tools/LLM_WSL/scripts/generate_npc_dataset.py"
+  ],
+  "acceptance_criteria": [
+    "Empty batch output folders created in research/<npc_id>/",
+    "NotebookLM rate limit delays added to generation script (between batches)",
+    "Batch size set to 25 examples per NotebookLM call",
+    "Total 200 examples per NPC configured (8 batches × 25)",
+    "Output path set to research/<npc_id>/notebooklm_batch_*.jsonl"
+  ],
+  "deliverables": [
+    "scripts/generate_npc_dataset.py (updated with rate limits)",
+    "Empty batch folders in research/<npc_id>/"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

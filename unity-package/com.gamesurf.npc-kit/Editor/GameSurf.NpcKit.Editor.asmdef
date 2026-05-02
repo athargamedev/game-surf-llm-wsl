@@ -1,0 +1,14 @@
+{
+    "name": "GameSurf.NpcKit.Editor",
+    "rootNamespace": "GameSurf.NpcKit.Editor",
+    "references": ["GameSurf.NpcKit"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -57,11 +57,15 @@
         },
         "lora_alpha": {
           "type": "integer",
-          "default": 16
+          "default": 32
         },
         "use_rslora": {
           "type": "boolean",
           "default": true
+        },
+        "quantization_method": {
+          "type": "string",
+          "default": "q4_k_m"
         }
       }
     },
@@ -70,7 +74,7 @@
       "properties": {
         "save_gguf": {
           "type": "string",
-          "default": "q4_k_m"
+          "default": "  q4_k_m"
         },
         "sync_to_unity": {
           "type": "boolean",

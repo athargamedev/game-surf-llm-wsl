@@ -1,0 +1,10 @@
+{
+  "id": "naming-convention-review-05",
+  "seq": "05",
+  "title": "Move legacy backups to backups/",
+"status": "completed",
+  "agent_id": "coder-agent",
+  "started_at": "2026-05-02T00:00:00Z",
+  "completed_at": "2026-05-02T00:30:00Z",
+  "completion_summary": "Moved maestro_jazz_instructor_legacy_baseline_20260422/ to backups/, created backups/ folder"
+}

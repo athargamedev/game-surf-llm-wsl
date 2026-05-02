@@ -1,0 +1,29 @@
+{
+  "id": "naming-convention-review-15",
+  "seq": "15",
+  "title": "Update dataset_registry.json: remove world_lore, fix kosmos→cosmos",
+  "status": "pending",
+  "depends_on": ["04", "07"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/dataset_registry.json"
+  ],
+  "acceptance_criteria": [
+    "world_lore entry removed from dataset_registry.json",
+    "kosmos_instructor renamed to cosmos_instructor in dataset_registry.json",
+    "All dataset paths follow kebab-case + _instructor_dataset suffix pattern",
+    "JSON file is valid and parseable"
+  ],
+  "deliverables": [
+    "/root/Game_Surf/Tools/LLM_WSL/datasets/configs/dataset_registry.json (updated)"
+  ],
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": null,
+  "completion_summary": null
+}

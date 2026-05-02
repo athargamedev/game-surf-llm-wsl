@@ -1,0 +1,194 @@
+---
+title: Game_Surf LLM_WSL — Script Execution Architecture
+---
+flowchart TD
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% LEGEND (node styles defined below)
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph LEGEND
+    L1([Service]):::service
+    L2[Pipeline Phase]:::pipeline
+    L3{{Entrypoint}}:::entry
+    L4[(Database)]:::db
+    L5[Utility]:::utility
+    L6[/Diagnostics//]:::diag
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% PHASE 0 — SERVICES
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph SVC
+    direction LR
+    SB([start_supabase_lmstudio.sh]):::service
+    DB[(Supabase\nPostgres + pgvector)]:::db
+    STUDIO([Supabase Studio\npatched → LM Studio]):::service
+    LMS([LM Studio\n:1234/v1]):::service
+    SRV([llm_integrated_server.py\nFastAPI :8000]):::service
+    WORKER([god_memory_worker.py\nQueue Processor]):::service
+    EMB[(BAAI/bge-small-en-v1.5\nEmbedding Model)]:::db
+
+    SB --> DB
+    SB --> STUDIO
+    STUDIO -. "AI proxy" .-> LMS
+    DB --> SRV
+    DB --> WORKER
+    LMS -. "dev inference" .-> SRV
+    EMB --> WORKER
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% CONFIG
+%% ─────────────────────────────────────────────────────────────────────────
+
+CFG[("datasets/configs/\nnpc_profiles.json")]:::db
+CONTRACTS[npc_pipeline_contract.py\nNpcSpec resolver]:::utility
+
+CFG --> CONTRACTS
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% ORCHESTRATOR
+%% ─────────────────────────────────────────────────────────────────────────
+
+ORCH{{run_full_npc_pipeline.py Orchestrator — Phases 1-5}}:::entry
+
+CONTRACTS --> ORCH
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% PHASE 1 — DATASET GENERATION
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph P1
+    direction TB
+    NLM[NotebookLM Research\nnotebooklm-mcp]:::utility
+    LOCAL_RESEARCH[Local LLM Research\nLM Studio fallback]:::utility
+    GEN[generate_npc_dataset.py\nAsyncOpenAI batching]:::pipeline
+    EXT[extract_notebooklm_jsonl.py]:::utility
+    IMP[import_notebooklm_jsonl.py]:::utility
+    RAW[("datasets/\nnpc_id_dataset.jsonl")]:::db
+
+    NLM --> GEN
+    LOCAL_RESEARCH --> GEN
+    EXT --> IMP --> GEN
+    GEN --> RAW
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% PHASE 2 — DATASET PREPARATION
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph P2
+    direction TB
+    PREP[prepare_dataset.py\nFilter · Dedupe · Split · Stratify]:::pipeline
+    AUDIT[audit_dataset_workflow.py]:::diag
+    SPLITS[("datasets/processed/\ntrain.jsonl\nvalidation.jsonl\ntest.jsonl")]:::db
+
+    PREP --> SPLITS
+    AUDIT -. "health check" .-> SPLITS
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% PHASE 3 — MODEL TRAINING
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph P3
+    direction TB
+    TRAIN[train_surf_llama.py\nUnsloth · LoRA · SFTTrainer]:::pipeline
+    METRICS[training_metrics.py\nLoss curve analysis]:::utility
+    CKPT[("exports/npc_models/\ncheckpoint-*/\nnpc_model_manifest.json")]:::db
+
+    TRAIN --> CKPT
+    TRAIN --> METRICS
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% PHASE 4 — EXPORT & SYNC
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph P4
+    direction TB
+    TOGUF[convert_lora_to_gguf.py\nLoRA → GGUF adapter]:::pipeline
+    EXPCKPT[export_unsloth_checkpoint.py\nManual checkpoint export]:::utility
+    SYNCART[sync_runtime_artifacts.py\nWSL → Unity StreamingAssets]:::pipeline
+    BACKFILL[backfill_npc_manifests.py\nRegenerate manifests]:::utility
+    SYNCPROF[sync_npc_profiles.py\nProfiles → Supabase]:::utility
+    GGUF[("exports/npc_models/\ngguf/\nadapter_model.gguf")]:::db
+    UNITY[("Unity\nStreamingAssets/\nNpcModels/<npc_id>/")]:::db
+
+    TOGUF --> GGUF
+    EXPCKPT --> GGUF
+    GGUF --> SYNCART
+    SYNCART --> UNITY
+    BACKFILL -. "repair" .-> GGUF
+    SYNCPROF --> DB
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% PHASE 5 — EVALUATION
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph P5
+    direction TB
+    QJ[quality_judge.py\nLLM-as-judge scoring]:::pipeline
+    EVAL[evaluate_model.py\nBenchmark runner]:::pipeline
+    BENCH[run_dialogue_benchmark.py\nLatency · Drift · Refusal]:::diag
+    REPORT[("reports/\nquality_reports/\nbenchmarks/")]:::db
+
+    QJ --> REPORT
+    EVAL --> REPORT
+    BENCH --> REPORT
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% DIAGNOSTICS (anytime)
+%% ─────────────────────────────────────────────────────────────────────────
+
+subgraph DIAG
+    direction LR
+    DSTUDIO[test_supabase_studio_ai.py\n12-test Studio AI suite]:::diag
+    DMEM[diagnose_memory_workflow.py\nMemory lifecycle test]:::diag
+    DPIPE[diagnose_pipeline.py\nDependency checklist]:::diag
+    REPAIR[repair_memory_state.py\nOrphaned session repair]:::diag
+    CLEANUP[cleanup_pipeline.py\nFree disk space]:::utility
+    GRAPH[generate_dialogue_relation_graph.py\nManual graph rebuild]:::utility
+    TRACK[track_workflow_run.py\nRun history logging]:::utility
+end
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% SEQUENTIAL EXECUTION FLOW
+%% ─────────────────────────────────────────────────────────────────────────
+
+SVC -->|"MUST be running"| ORCH
+ORCH --> P1
+P1 -->|"RAW JSONL ready"| P2
+P2 -->|"train.jsonl ready"| P3
+
+P3 -->|"STOP server first!\nfree VRAM"| SRV
+P3 --> P4
+
+P4 --> P5
+SRV -. "still needed\nfor evaluation" .-> P5
+
+GGUF -. "runtime loads" .-> SRV
+UNITY -. "runtime loads\nvia C# P/Invoke" .-> P5
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% ASYNC BACKGROUND FLOWS
+%% ─────────────────────────────────────────────────────────────────────────
+
+SRV -. "enqueues jobs\non session end" .-> DB
+DB -. "pgmq_read\nembedding + graph" .-> WORKER
+WORKER -. "upserts embeddings\n& graph nodes" .-> DB
+
+%% ─────────────────────────────────────────────────────────────────────────
+%% STYLES
+%% ─────────────────────────────────────────────────────────────────────────
+
+classDef service fill:#1a3a5c,stroke:#4fc3f7,color:#e0f7fa
+classDef pipeline fill:#1b4332,stroke:#52b788,color:#d8f3dc
+classDef entry fill:#4a1040,stroke:#e040fb,color:#fce4ec
+classDef db fill:#2d2d00,stroke:#f9a825,color:#fff9c4
+classDef utility fill:#1a1a2e,stroke:#7986cb,color:#e8eaf6
+classDef diag fill:#3e1000,stroke:#ff7043,color:#fbe9e7

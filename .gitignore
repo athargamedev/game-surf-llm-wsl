@@ -5,6 +5,8 @@
 .docker-cache/
 .cache/
 .pytest_cache/
+__pycache__/
+*.pyc
 *.gguf
 
 # Unsloth auto-generated trainer compilation cache (regenerated on each training run)

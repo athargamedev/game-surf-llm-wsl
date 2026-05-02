@@ -1,0 +1,85 @@
+{
+  "ki_version": "2.0",
+  "last_updated": "2026-05-02",
+  "topic": "GameSurf NPC Kit — Infrastructure, Training Pipeline & Reliability",
+  "context_rules": [
+    {
+      "trigger": "configuring OpenAI/LLM endpoints",
+      "rule": "ALWAYS use host LAN IP (e.g. 192.168.0.x) instead of host.docker.internal for WSL environments."
+    },
+    {
+      "trigger": "editing supabase/config.toml",
+      "rule": "NEVER add 'custom_image' or 'openai_base_url' keys; they break the CLI 2.x parser. Use docker/start-studio-lmstudio.sh instead."
+    },
+    {
+      "trigger": "debugging AI chat in Studio",
+      "rule": "Inspect docker/supabase-studio-lmstudio/runtime-configure-studio.js to see how env vars are baked into Next.js bundles."
+    },
+    {
+      "trigger": "starting background services (god_memory_worker, log-forwarder)",
+      "rule": "ALWAYS use PM2, not raw bash '&' backgrounding. PM2 provides auto-restart on crash and log rotation. Command: pm2 start scripts/god_memory_worker.py --name god-memory-worker --interpreter python3"
+    },
+    {
+      "trigger": "stopping or restarting god_memory_worker.py",
+      "rule": "The worker has SIGINT/SIGTERM handlers — it will finish its current job before exiting. Use 'pm2 stop god-memory-worker' for graceful shutdown. NEVER kill -9 while the graph rebuild is running."
+    },
+    {
+      "trigger": "adding or modifying pgvector indexes",
+      "rule": "ALWAYS use HNSW indexes (not IVFFlat). IVFFlat builds bad clusters on empty tables. HNSW parameters: m=16, ef_construction=64 for 384-dimensional cosine vectors. Example: CREATE INDEX name ON table USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);"
+    },
+    {
+      "trigger": "choosing an embedding model",
+      "rule": "Use BAAI/bge-small-en-v1.5 (384 dimensions) for local NPC memory. Do NOT switch to 768 or 1536 dim models without also running the fix_embedding_vector_dimensions migration. Distance metric MUST be cosine (vector_cosine_ops)."
+    },
+    {
+      "trigger": "running GPU-heavy ML tasks (Unsloth training, embedding)",
+      "rule": "Keep ML workloads (train_surf_llama.py, god_memory_worker.py) on the WSL host — NOT in Docker. Docker GPU passthrough adds VRAM overhead and latency. Supabase stack stays in Docker; Python ML stack stays native on host."
+    },
+    {
+      "trigger": "generating NPC datasets with NotebookLM",
+      "rule": "NotebookLM enforces rate limits: max ~5 queries per burst. The generator batches queries in groups of 5 with a 15s inter-batch cooldown and 4s between individual queries, and 5s between source additions. Do not remove these delays."
+    },
+    {
+      "trigger": "setting dataset target count",
+      "rule": "Minimum 300 examples per NPC for a 7B LoRA fine-tune. Below 150 causes catastrophic overfitting. The pipeline default is now 300. Use --target-count 500 for best results."
+    },
+    {
+      "trigger": "setting task_type_distribution in npc_profiles.json",
+      "rule": "ALL profiles must include multi_turn in their distribution. Standard split: teaching=0.55, quiz=0.25, multi_turn=0.20. Never use a distribution with only 'teaching' and 'quiz' — the model will not learn multi-turn context handling."
+    },
+    {
+      "trigger": "running the full pipeline",
+      "rule": "Phase 1b (post-generation quality gate) now auto-runs after Phase 1 unless --skip-eval is passed. It samples 30 examples through quality_judge.py. Phase 5 benchmarks now look in benchmarks/npc_dialogue/{npc_key}.json first, then fall back to benchmarks/npc_eval.json."
+    },
+    {
+      "trigger": "committing Python code to git",
+      "rule": "__pycache__/ and *.pyc are in .gitignore. Never commit them. They are auto-generated per-machine bytecode caches."
+    }
+  ],
+  "verified_endpoints": {
+    "lmstudio": "http://192.168.0.3:1234/v1",
+    "studio_dashboard": "http://127.0.0.1:16434",
+    "pm2_status": "pm2 status",
+    "pm2_logs": "pm2 logs",
+    "pm2_monitor": "pm2 monit"
+  },
+  "infrastructure": {
+    "process_manager": "PM2 (npm install -g pm2)",
+    "supabase_stack": "Docker (docker/start-studio-lmstudio.sh)",
+    "ml_stack": "WSL host native (conda base env)",
+    "vector_index_type": "HNSW",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "embedding_dimensions": 384,
+    "chat_model": "qwen2.5-coder-7b-instruct",
+    "lmstudio_ip": "192.168.0.3:1234"
+  },
+  "dataset_standards": {
+    "min_examples_per_npc": 300,
+    "recommended_examples": 500,
+    "task_distribution": {"teaching": 0.55, "quiz": 0.25, "multi_turn": 0.20},
+    "format": "ChatML (messages array with system/user/assistant)",
+    "required_metadata_keys": ["npc_scope", "task_type", "source_kind", "quality", "npc_key"],
+    "memory_placeholder": "{player_memory_summary} must remain as template string in system prompt — never pre-fill it",
+    "quality_threshold": 0.75
+  }
+}

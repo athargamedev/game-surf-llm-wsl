@@ -12,9 +12,9 @@ alter table public.dialogue_turn_embeddings
     using embedding::vector(384);
 
 create index if not exists player_memory_embeddings_embedding_idx
-    on public.player_memory_embeddings using ivfflat (embedding vector_cosine_ops)
-    with (lists = 100);
+    on public.player_memory_embeddings using hnsw (embedding vector_cosine_ops)
+    with (m = 16, ef_construction = 64);
 
 create index if not exists dialogue_turn_embeddings_embedding_idx
-    on public.dialogue_turn_embeddings using ivfflat (embedding vector_cosine_ops)
-    with (lists = 100);
+    on public.dialogue_turn_embeddings using hnsw (embedding vector_cosine_ops)
+    with (m = 16, ef_construction = 64);

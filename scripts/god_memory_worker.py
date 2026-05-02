@@ -8,8 +8,19 @@ import json
 import os
 import sys
 import time
+import signal
 from pathlib import Path
 from typing import Any, Optional
+
+shutdown_flag = False
+
+def handle_shutdown(signum, frame):
+    global shutdown_flag
+    print("\n[Worker] Received shutdown signal. Finishing current job...")
+    shutdown_flag = True
+
+signal.signal(signal.SIGINT, handle_shutdown)
+signal.signal(signal.SIGTERM, handle_shutdown)
 
 import requests
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -270,7 +281,7 @@ def poll_queues(supabase: Client, embedding_model, poll_interval: int = 5, batch
     """Poll and process job queues."""
     print(f"\n[Worker] Starting job queue polling (interval={poll_interval}s)...\n")
 
-    while True:
+    while not shutdown_flag:
         try:
             # Process graph rebuild jobs
             try:

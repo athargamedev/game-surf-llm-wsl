@@ -16,8 +16,8 @@ create index if not exists player_memory_embeddings_player_npc_idx
     on public.player_memory_embeddings (player_id, npc_id);
 
 create index if not exists player_memory_embeddings_embedding_idx 
-    on public.player_memory_embeddings using ivfflat (embedding vector_cosine_ops)
-    with (lists = 100);
+    on public.player_memory_embeddings using hnsw (embedding vector_cosine_ops)
+    with (m = 16, ef_construction = 64);
 
 -- Optional: Store raw turn embeddings for tracing and semantic retrieval
 create table if not exists public.dialogue_turn_embeddings (
@@ -34,8 +34,8 @@ create index if not exists dialogue_turn_embeddings_session_idx
     on public.dialogue_turn_embeddings (session_id);
 
 create index if not exists dialogue_turn_embeddings_embedding_idx 
-    on public.dialogue_turn_embeddings using ivfflat (embedding vector_cosine_ops)
-    with (lists = 100);
+    on public.dialogue_turn_embeddings using hnsw (embedding vector_cosine_ops)
+    with (m = 16, ef_construction = 64);
 
 -- Materialized relation graph for fast rendering
 create table if not exists public.relation_graph_nodes (

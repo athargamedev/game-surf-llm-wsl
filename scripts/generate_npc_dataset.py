@@ -243,30 +243,41 @@ def research_via_notebooklm(
                 "--wait",
             ]
         )
-        time.sleep(2)  # Rate limiting
+        time.sleep(5)  # 5s between source ingestions — avoids NotebookLM queue overflow
 
-    # Step 3: Query for domain knowledge
-    for query in profile.research_queries:
-        print(f"  Querying: {query[:60]}...")
-        result = _run_notebooklm_command(
-            [
-                "notebooklm",
-                "notebook",
-                "query",
-                notebook_id,
-                query,
-            ]
-        )
-        if result:
-            notes.append(
-                ResearchNote(
-                    query=query,
-                    answer=result.strip(),
-                    source="notebooklm",
-                    topics=_extract_topics(query, profile.domain_knowledge),
-                )
+    # Step 3: Query for domain knowledge in batches to respect NotebookLM rate limits
+    # NotebookLM allows ~5 queries before enforcing a cooldown period.
+    QUERY_BATCH_SIZE = 5
+    QUERY_BATCH_COOLDOWN = 15  # seconds between batches
+    QUERY_INTER_DELAY = 4      # seconds between individual queries within a batch
+
+    for batch_idx in range(0, len(profile.research_queries), QUERY_BATCH_SIZE):
+        batch = profile.research_queries[batch_idx : batch_idx + QUERY_BATCH_SIZE]
+        if batch_idx > 0:
+            print(f"  [RateLimit] Batch {batch_idx // QUERY_BATCH_SIZE + 1}: cooling down {QUERY_BATCH_COOLDOWN}s...")
+            time.sleep(QUERY_BATCH_COOLDOWN)
+
+        for query in batch:
+            print(f"  Querying: {query[:60]}...")
+            result = _run_notebooklm_command(
+                [
+                    "notebooklm",
+                    "notebook",
+                    "query",
+                    notebook_id,
+                    query,
+                ]
             )
-        time.sleep(3)  # Rate limiting
+            if result:
+                notes.append(
+                    ResearchNote(
+                        query=query,
+                        answer=result.strip(),
+                        source="notebooklm",
+                        topics=_extract_topics(query, profile.domain_knowledge),
+                    )
+                )
+            time.sleep(QUERY_INTER_DELAY)
 
     return notes
 

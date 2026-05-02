@@ -1,6 +1,6 @@
 # Project Context Intelligence
 
-Last updated: 2026-05-01 (updated with workflow improvements)
+Last updated: 2026-05-02 (updated with Supabase Studio LM Studio assistant model-selection fixes)
 
 This file records durable workflow lessons for Game_Surf NPC dataset generation, WSL Unsloth training, runtime validation, and Supabase memory testing.
 
@@ -121,6 +121,34 @@ bash scripts/start_servers.sh
 - Current local integration uses `/mnt/d/GithubRepos/supabasecli/bin/supabase-lmstudio` and `scripts/start_supabase_lmstudio.sh`; start with `-x storage-api,imgproxy,supavisor`, not `pooler`, on the latest CLI fork.
 - Verified integration means the Studio SQL assistant route returns `200 OK` through LM Studio. Structured-output routes still need local-model prompt/model tuning because they can fail with unparseable object responses.
 - Full research and implementation path: `docs/LOCAL_SUPABASE_CUSTOMIZATION_RESEARCH.md`.
+
+### Supabase Studio Assistant Fixes (2026-05-02)
+
+- The Studio assistant model dropdown defaults (`gpt-5.4-nano`, `gpt-5.3-codex`) are patched at build time in `docker/supabase-studio-lmstudio/patch-studio-lmstudio.js`.
+- Studio now builds `ASSISTANT_MODELS` from local env/model catalog:
+  - primary source: `STUDIO_OPENAI_MODELS`
+  - fallback merge: `STUDIO_OPENAI_MODEL`, `STUDIO_OPENAI_ADVANCED_MODEL`
+- Runtime provider/model patch behavior:
+  - uses `createOpenAI({ baseURL, apiKey })` when `STUDIO_OPENAI_BASE_URL` or `OPENAI_BASE_URL` is set
+  - keeps OpenAI default provider only when no local base URL exists
+  - rewrites direct `https://api.openai.com/v1/chat/completions` calls to `${baseURL}/chat/completions`
+- Startup model catalog path is now in `scripts/start_supabase_lmstudio.sh`:
+  - fetches `${STUDIO_OPENAI_BASE_URL}/models`
+  - filters embedding-only IDs from chat dropdown catalog
+  - prioritizes chat defaults (`qwen2.5-coder-7b-instruct`, then `qwen3-8b`, etc.)
+  - exports ordered catalog for Studio dropdown/selectability
+- Local prompt optimization for Studio assistant is injected only for local-provider mode through `STUDIO_OPENAI_PROMPT_PREFIX` (SQL-safe concise instruction for local models).
+- `supabase/config.toml` must keep Studio AI fields env-backed:
+  - `openai_api_key = "env(OPENAI_API_KEY)"`
+  - `openai_base_url = "env(STUDIO_OPENAI_BASE_URL)"`
+  - `openai_model = "env(STUDIO_OPENAI_MODEL)"`
+  - `openai_advanced_model = "env(STUDIO_OPENAI_ADVANCED_MODEL)"`
+  - `custom_image = "localhost/gamesurf/supabase-studio:lmstudio-local"`
+- Operational rule: with these custom Studio keys, use the patched CLI path (`supabase-lmstudio`) for status/start/stop. Stock `supabase` CLI rejects these keys.
+- Verification rule:
+  - running container image must be `localhost/gamesurf/supabase-studio:lmstudio-local`
+  - container env must show `OPENAI_BASE_URL`/`STUDIO_OPENAI_BASE_URL` and selected model catalog values
+  - Studio bundle should include both `STUDIO_OPENAI_MODELS` catalog patch and prompt-prefix patch strings
 
 ## Current Project State (2026-05-01)
 

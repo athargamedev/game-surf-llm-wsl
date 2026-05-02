@@ -1,0 +1,28 @@
+{
+  "id": "naming-convention-review-13",
+  "seq": "13",
+  "title": "Rename datasets/processed/solar_system_dataset/ to datasets/processed/solar_system_instructor_dataset/",
+  "status": "completed",
+  "depends_on": ["01"],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/core/standards/code-quality.md",
+    "/root/Game_Surf/Tools/LLM_WSL/.opencode/context/project-intelligence/code-standards.md"
+  ],
+  "reference_files": [
+    "/root/Game_Surf/Tools/LLM_WSL/AGENTS.md"
+  ],
+  "acceptance_criteria": [
+    "datasets/processed/solar_system_dataset/ renamed to datasets/processed/solar_system_instructor_dataset/",
+    "All contents preserved in renamed folder",
+    "Old folder name no longer exists"
+  ],
+  "deliverables": [
+    "datasets/processed/solar_system_instructor_dataset/ (renamed)"
+  ],
+  "agent_id": "opencode",
+  "started_at": "2026-05-02T03:00:00Z",
+  "completed_at": "2026-05-02T03:05:00Z",
+  "completion_summary": "Renamed datasets/processed/solar_system_dataset/ to datasets/processed/solar_system_instructor_dataset/ - all contents preserved."
+}

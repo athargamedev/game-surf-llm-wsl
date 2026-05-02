@@ -92,11 +92,15 @@ port = 16434
 # External URL of the API server that frontend connects to.
 api_url = "http://127.0.0.1"
 # OpenAI API Key to use for Supabase AI in the Supabase Studio.
-openai_api_key = "lm-studio"
-openai_base_url = "http://host.docker.internal:1234/v1"
-openai_model = "qwen2.5-coder-7b-instruct"
-openai_advanced_model = "qwen3-8b"
-custom_image = "localhost/gamesurf/supabase-studio:lmstudio-local"
+openai_api_key = "env(OPENAI_API_KEY)"
+# --- LMStudio Integration ---
+# The keys below are NOT supported by supabase CLI config.toml.
+# Instead, the custom Studio image is run via docker/start-studio-lmstudio.sh
+# which passes these as Docker env vars:
+#   OPENAI_BASE_URL, STUDIO_OPENAI_BASE_URL  -> LMStudio endpoint
+#   STUDIO_OPENAI_MODEL                      -> comma-separated model IDs
+#   STUDIO_OPENAI_ADVANCED_MODEL             -> advanced/reasoning model ID
+# See: docker/supabase-studio-lmstudio/ for the patched image source.
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
 # are monitored, and you can view the emails that would have been sent from the web interface.

@@ -1,0 +1,40 @@
+{
+  "name": "com.gamesurf.npc-kit",
+  "version": "0.1.0",
+  "displayName": "GameSurf NPC Kit",
+  "description": "Local LLM-powered NPC dialogue system with fine-tuned LoRA personality adapters, persistent memory via Supabase, and runtime model hot-swapping. Train custom NPC characters on your own knowledge sources and deploy them in Unity with no cloud API dependency.",
+  "unity": "2022.3",
+  "unityRelease": "0f1",
+  "documentationUrl": "https://github.com/AtharvGameDev/gamesurf-npc-kit",
+  "changelogUrl": "https://github.com/AtharvGameDev/gamesurf-npc-kit/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/AtharvGameDev/gamesurf-npc-kit/blob/main/LICENSE.md",
+  "keywords": [
+    "npc",
+    "llm",
+    "ai",
+    "dialogue",
+    "lora",
+    "llama",
+    "supabase",
+    "memory",
+    "fine-tuning",
+    "character"
+  ],
+  "author": {
+    "name": "GameSurf",
+    "url": "https://github.com/AtharvGameDev"
+  },
+  "type": "library",
+  "samples": [
+    {
+      "displayName": "Basic NPC Chat",
+      "description": "Minimal NPC dialogue setup with a single NPC and basic UI",
+      "path": "Samples~/BasicNpcChat"
+    },
+    {
+      "displayName": "Memory Persistence",
+      "description": "Demonstrates cross-session memory persistence with Supabase",
+      "path": "Samples~/MemoryPersistence"
+    }
+  ]
+}

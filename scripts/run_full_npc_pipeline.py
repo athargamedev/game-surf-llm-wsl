@@ -95,7 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="End-to-end NPC NotebookLM dataset and WSL Unsloth training orchestrator.")
     parser.add_argument("--npc", required=True, help="Registered NPC key (e.g., 'kai_instructor')")
     parser.add_argument("--subject", default="", help="Optional specific subject for dataset generation.")
-    parser.add_argument("--target-count", type=int, default=150, help="Number of interactions to generate.")
+    parser.add_argument("--target-count", type=int, default=300, help="Number of interactions to generate (min 300 for stable fine-tuning).")
     parser.add_argument("--skip-generation", action="store_true", help="Skip generation and reuse the existing raw dataset.")
     parser.add_argument("--skip-prep", action="store_true", help="Skip dataset preparation and reuse existing prepared splits.")
     parser.add_argument("--skip-training", action="store_true", help="Skip the Unsloth fine-tuning phase.")
@@ -176,6 +176,28 @@ def main() -> None:
         run_command(gen_cmd)
     else:
         print("\n>>> Skipping Phase 1 (Dataset Generation).")
+
+    # ── Phase 1b: Post-Generation Quality Gate ────────────────────────────────
+    if not args.skip_generation and not args.skip_eval and spec.raw_dataset_path.exists():
+        print("\n>>> Phase 1b: Post-Generation Quality Gate")
+        judge_cmd = [
+            sys.executable,
+            "scripts/quality_judge.py",
+            "--input",
+            str(spec.raw_dataset_path),
+            "--npc",
+            spec.npc_key,
+            "--report",
+            "--async-batch",
+            "--batch-size",
+            "5",
+            "--max-examples",
+            "30",  # Sample 10% of 300 for fast feedback
+        ]
+        try:
+            run_command(judge_cmd)
+        except SystemExit:
+            print("  [WARN] Quality gate failed (non-fatal). LLM server may not be running.")
 
     if not args.skip_prep:
         print("\n>>> Phase 2: Dataset Preparation")
@@ -328,10 +350,13 @@ def main() -> None:
             except SystemExit:
                 print("  [WARN] Quality judge failed (non-fatal). LLM server may not be running.")
 
-        # 5b: Run NPC eval benchmarks if benchmark file exists
-        benchmark_file = ROOT_DIR / "benchmarks" / "npc_eval.json"
+        # 5b: Run NPC eval benchmarks if per-NPC benchmark file exists
+        benchmark_file = ROOT_DIR / "benchmarks" / "npc_dialogue" / f"{spec.npc_key}.json"
+        if not benchmark_file.exists():
+            # Fall back to legacy location
+            benchmark_file = ROOT_DIR / "benchmarks" / "npc_eval.json"
         if benchmark_file.exists():
-            print("\n  [5b] Running NPC evaluation benchmarks...")
+            print(f"\n  [5b] Running NPC evaluation benchmarks ({benchmark_file.name})...")
             eval_cmd = [
                 "python",
                 "scripts/evaluate_model.py",

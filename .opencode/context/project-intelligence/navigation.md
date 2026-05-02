@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: critical | Version: 1.4 | Updated: 2026-04-22 -->
+<!-- Context: project-intelligence/nav | Priority: high | Version: 1.0 | Updated: 2025-01-12 -->
 
 # Project Intelligence
 
@@ -11,55 +11,21 @@
 ├── navigation.md              # This file - quick overview
 ├── business-domain.md         # Business context and problem statement
 ├── technical-domain.md        # Stack, architecture, technical decisions
-├── code-standards.md          # Python patterns, naming, security
-├── supabase-patterns.md       # Database patterns, memory workflow
 ├── business-tech-bridge.md    # How business needs map to solutions
 ├── decisions-log.md           # Major decisions with rationale
-├── living-notes.md            # Active issues, debt, open questions
-└── test-workflow.md           # Test suites and 10-player stress test
+└── living-notes.md            # Active issues, debt, open questions
 ```
 
 ## Quick Routes
 
-| File | Description | Priority |
-|------|-------------|----------|
-| `business-domain.md` | Problem, users, value proposition | high |
-| `technical-domain.md` | Stack, architecture, integrations | **critical** |
-| `code-standards.md` | Python patterns, naming, security | **critical** |
-| `supabase-patterns.md` | Database patterns, memory workflow | high |
-| `test-workflow.md` | Test suites, 10-player stress test | **high** |
-| `business-tech-bridge.md` | Business → technical mapping | high |
-| `decisions-log.md` | Why decisions were made | medium |
-| `living-notes.md` | Active issues and open questions | medium |
-
-## Canonical New NPC Route
-
-Use this route for creating and activating a new NPC with the proven NotebookLM-direct path:
-
-1. Verify notebook + NPC profile → `technical-domain.md`
-2. Generate NotebookLM-direct JSONL batches → `technical-domain.md`, `docs/NOTEBOOKLM_DATASET_WORKFLOW.md`
-3. Import + prepare dataset → `docs/NOTEBOOKLM_DATASET_WORKFLOW.md`
-4. Train LoRA + validate manifest/artifacts → `docs/PIPELINE_REFERENCE.md`
-5. Restart runtime correctly → `technical-domain.md`
-6. Final proof via chat + `/test-10-player` + Supabase memories → `test-workflow.md`
-
-**Worked example:** `brazilian_history` → `brazilian_history_instructor`
-
-## Developer Commands
-
-```bash
-# Start servers (auto-finds free port)
-python scripts/server_manager.py start --auto
-
-# Check what process owns a port
-python scripts/server_manager.py check 8000
-
-# Check all servers
-python scripts/server_manager.py status
-
-# Kill process on port
-python scripts/server_manager.py kill-port 8000
-```
+| What You Need | File | Description |
+|---------------|------|-------------|
+| Understand the "why" | `business-domain.md` | Problem, users, value proposition |
+| Understand the "how" | `technical-domain.md` | Stack, architecture, integrations |
+| See the connection | `business-tech-bridge.md` | Business → technical mapping |
+| Know the context | `decisions-log.md` | Why decisions were made |
+| Current state | `living-notes.md` | Active issues and open questions |
+| All of the above | Read all files in order | Full project intelligence |
 
 ## Usage
 

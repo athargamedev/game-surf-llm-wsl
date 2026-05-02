@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameSurf AI Performance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --card-bg: #1a1a1a;
+            --accent-color: #3ecf8e;
+            --text-color: #f0f0f0;
+            --border-color: #333;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-weight: 600;
+            font-size: 24px;
+            margin: 0;
+            color: var(--accent-color);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-color);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat {
+            font-size: 32px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
+        .log-container {
+            grid-column: span 2;
+            height: 300px;
+            overflow-y: auto;
+            background: #000;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            border-left: 2px solid #444;
+            padding-left: 10px;
+        }
+
+        .log-entry.studio { border-color: #3ecf8e; }
+        .log-entry.kong { border-color: #5d5dff; }
+        .log-entry.edge { border-color: #ff5d5d; }
+
+        canvas {
+            max-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>GameSurf Dataflow Dashboard</h1>
+        <div id="status" style="color: #3ecf8e;">● SYSTEM ONLINE</div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h2>LMStudio Response Time</h2>
+            <div class="stat" id="llm-latency">-- ms</div>
+            <canvas id="latencyChart"></canvas>
+        </div>
+        <div class="card">
+            <h2>Active Containers</h2>
+            <div id="container-status">
+                <div style="margin: 5px 0;">🟢 Studio</div>
+                <div style="margin: 5px 0;">🟢 Kong</div>
+                <div style="margin: 5px 0;">🟢 Edge Runtime</div>
+            </div>
+        </div>
+        <div class="card log-container" id="logs">
+            <h2>Real-time Log Stream</h2>
+            <div id="log-entries"></div>
+        </div>
+    </div>
+
+    <script>
+        const logsDiv = document.getElementById('log-entries');
+        const latencyStat = document.getElementById('llm-latency');
+        
+        // Setup Chart
+        const ctx = document.getElementById('latencyChart').getContext('2d');
+        const latencyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Latency (ms)',
+                    data: [],
+                    borderColor: '#3ecf8e',
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: 'rgba(62, 207, 142, 0.1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { display: false },
+                    y: { beginAtZero: true, grid: { color: '#333' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // Connect to Log Stream
+        const evtSource = new EventSource("http://127.0.0.1:16435");
+        
+        evtSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + data.container.split('_')[1];
+            entry.innerHTML = `<span style="color: #888">[${data.timestamp.split('T')[1].split('.')[0]}]</span> <strong>${data.container}</strong>: ${data.message}`;
+            
+            logsDiv.prepend(entry);
+            if (logsDiv.childNodes.length > 50) logsDiv.lastChild.remove();
+
+            // Detect AI Latency from logs
+            if (data.message.includes('generateAssistantResponse') && data.message.includes('ms')) {
+                const match = data.message.match(/(\d+)ms/);
+                if (match) {
+                    const latency = parseInt(match[1]);
+                    latencyStat.innerText = latency + ' ms';
+                    
+                    latencyChart.data.labels.push('');
+                    latencyChart.data.datasets[0].data.push(latency);
+                    if (latencyChart.data.labels.length > 20) {
+                        latencyChart.data.labels.shift();
+                        latencyChart.data.datasets[0].data.shift();
+                    }
+                    latencyChart.update();
+                }
+            }
+        };
+
+        evtSource.onerror = () => {
+            document.getElementById('status').innerHTML = '● RECONNECTING...';
+            document.getElementById('status').style.color = '#ff9900';
+        };
+    </script>
+</body>
+</html>

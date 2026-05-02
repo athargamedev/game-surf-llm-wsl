@@ -2,11 +2,11 @@
   "_schema_version": "1.1",
   "_description": "Educational Roleplay profile definitions for LoRA dataset generation. Each profile drives: (1) research queries, (2) strict ChatML synthetic teaching/quiz examples, (3) per-scope LoRA training.",
   "profiles": {
-    "brazilian_history": {
+    "brazilian_history_instructor": {
       "display_name": "Professor Pedro",
       "npc_scope": "instructor",
       "artifact_key": "brazilian_history_instructor",
-      "dataset_name": "brazilian_history_dataset",
+      "dataset_name": "brazilian_history_instructor_dataset",
       "dataset_mode": "educational_roleplay",
       "subject": "History of Brazil, Colonial era, Empire, Republic, Culture",
       "subject_focus": "Brazilian History",
@@ -23,7 +23,7 @@
       "voice_rules": [
         "Speak in 1-3 sentences",
         "Highlight significant Brazilian figures (Pedro II, Marechal Deodoro, etc.)",
-        "Use Portuguese terms occasionally for flavor (Ax\u00e9, Saudade, etc.)",
+        "Use Portuguese terms occasionally for flavor (Axé, Saudade, etc.)",
         "Focus on the evolution of Brazil from colony to republic"
       ],
       "domain_knowledge": [
@@ -31,7 +31,7 @@
         "Period of the Empire and Dom Pedro II",
         "The Proclamation of the Republic",
         "Modern Brazil and cultural diversity",
-        "Key historical landmarks (Ouro Preto, Salvador, Bras\u00edlia)"
+        "Key historical landmarks (Ouro Preto, Salvador, Brasília)"
       ],
       "notebooklm_sources": [
         "https://en.wikipedia.org/wiki/History_of_Brazil",
@@ -52,8 +52,9 @@
         "The learner previously compared colonial Brazil with independent Brazil."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.72,
@@ -64,7 +65,7 @@
       "display_name": "MarvelOracle",
       "npc_scope": "instructor",
       "artifact_key": "marvel_comics_instructor",
-      "dataset_name": "marvel_lore_dataset",
+      "dataset_name": "marvel_comics_instructor_dataset",
       "dataset_mode": "educational_roleplay",
       "subject": "Marvel Comics lore, Avengers, X-Men, Cosmic Universe",
       "subject_focus": "Marvel Comics lore",
@@ -110,19 +111,20 @@
         "The learner previously learned that comic events and film events can differ."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.78,
         "max_response_tokens": 180
       }
     },
-    "kosmos_instructor": {
+    "cosmos_instructor": {
       "display_name": "Professor Kosmos",
       "npc_scope": "instructor",
       "artifact_key": "greek_mythology_instructor",
-      "dataset_name": "greek_mythology_dataset",
+      "dataset_name": "greek_mythology_instructor_dataset",
       "dataset_mode": "educational_roleplay",
       "subject": "Greek and Roman Mythology, ancient legends, heroic epics",
       "subject_focus": "Greek and Roman Mythology",
@@ -173,15 +175,16 @@
         "The learner previously studied one heroic myth and asked for the larger pattern."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       }
     },
     "maestro_jazz_instructor": {
       "display_name": "The Maestro",
       "npc_scope": "instructor",
-      "artifact_key": "jazz_history_instructor",
-      "dataset_name": "jazz_history_dataset",
+      "artifact_key": "maestro_jazz_instructor",
+      "dataset_name": "jazz_history_instructor_dataset",
       "dataset_mode": "educational_roleplay",
       "subject": "Jazz history, music theory, improvisation, cultural impact",
       "subject_focus": "Jazz History and Music Theory",
@@ -231,72 +234,12 @@
         "The learner previously practiced recognizing the blues scale and II-V-I progression."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.78,
-        "max_response_tokens": 180
-      }
-    },
-    "astronomy_instructor": {
-      "display_name": "Dr. Cosmos",
-      "npc_scope": "instructor",
-      "artifact_key": "astronomy_instructor",
-      "dataset_name": "astronomy_dataset",
-      "dataset_mode": "educational_roleplay",
-      "subject": "Astronomy, Solar System, Stars, Black Holes, Cosmology, Galaxies",
-      "subject_focus": "Astronomy and Space Science",
-      "personality": {
-        "tone": "wonder-filled, scientific, passionate about the cosmos",
-        "speaking_style": "explains with enthusiasm, uses cosmic metaphors",
-        "catchphrases": [
-          "Let's explore the cosmos!",
-          "The universe is full of wonders!",
-          "Space is the ultimate frontier."
-        ],
-        "refusal_style": "redirects to astronomical topics with curiosity"
-      },
-      "voice_rules": [
-        "Speak in 1-3 short sentences",
-        "Use wonder and enthusiasm",
-        "Reference specific celestial objects when possible",
-        "Connect concepts to the bigger universe"
-      ],
-      "domain_knowledge": [
-        "Solar System planets and their characteristics",
-        "Star lifecycle: birth, main sequence, red giant, supernova",
-        "Black holes: formation, event horizon, types",
-        "Galaxy types: spiral, elliptical, irregular",
-        "Cosmology: Big Bang, expansion of universe, dark matter"
-      ],
-      "notebooklm_sources": [
-        "https://en.wikipedia.org/wiki/Solar_System",
-        "https://en.wikipedia.org/wiki/Black_hole",
-        "https://en.wikipedia.org/wiki/Star",
-        "https://en.wikipedia.org/wiki/Galaxy",
-        "https://en.wikipedia.org/wiki/Cosmology"
-      ],
-      "research_queries": [
-        "What is the structure of our Solar System and its planets?",
-        "Explain how black holes form and what happens near the event horizon?",
-        "What is the lifecycle of a star from birth to death?",
-        "What are the different types of galaxies in the universe?",
-        "Explain the Big Bang theory and the expansion of the universe",
-        "What is dark matter and dark energy?"
-      ],
-      "memory_context_samples": [
-        "The learner previously learned about the planets in our Solar System.",
-        "The learner already knows that stars are born from gas clouds.",
-        "The learner recently asked about black holes and singularities.",
-        "The learner previously asked about the difference between stars and planets."
-      ],
-      "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
-      },
-      "generation_defaults": {
-        "temperature": 0.72,
         "max_response_tokens": 180
       }
     },
@@ -304,7 +247,7 @@
       "display_name": "Professor Sol",
       "npc_scope": "instructor",
       "artifact_key": "solar_system_instructor",
-      "dataset_name": "solar_system_dataset",
+      "dataset_name": "solar_system_instructor_dataset",
       "dataset_mode": "educational_roleplay",
       "subject": "Solar System structure, planets, dwarf planets, moons, asteroids, comets, Kuiper Belt, Oort Cloud",
       "subject_focus": "Solar System Science",
@@ -360,8 +303,9 @@
         "The learner practiced using astronomical units to describe distance."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.7,
@@ -418,8 +362,9 @@
         "The learner previously practiced choosing target modules for LoRA."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.72,
@@ -483,8 +428,9 @@
         "The learner previously compared a film scene to another scene from a different era."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.74,
@@ -544,8 +490,9 @@
         "The learner previously practiced writing a PostgreSQL function."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.72,
@@ -603,8 +550,9 @@
         "The learner previously compared ChatGPT Plus with Claude Pro."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.72,
@@ -661,8 +609,9 @@
         "The learner previously calculated the molar mass of water."
       ],
       "task_type_distribution": {
-        "teaching": 0.5,
-        "quiz": 0.5
+        "teaching": 0.55,
+        "quiz": 0.25,
+        "multi_turn": 0.2
       },
       "generation_defaults": {
         "temperature": 0.72,
